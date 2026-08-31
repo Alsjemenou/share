@@ -1,0 +1,213 @@
+@import "tailwindcss";
+
+:root {
+  --background: #030712;
+  --foreground: #f9fafb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* ── Mobile responsive helpers ──────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .overflow-hidden:has(table) {
+    overflow-x: auto !important;
+  }
+  table {
+    min-width: 480px;
+  }
+
+  .fixed.inset-0 > div[class*="max-w-"] {
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    overflow-y: auto;
+    margin: 1rem;
+  }
+}
+
+/* ── Light mode ───────────────────────────────────────────────────────── */
+
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html.light input[type="date"]::-webkit-calendar-picker-indicator,
+html.light input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+html.light main .bg-gray-950,
+html.light main [class*="bg-gray-950"] {
+  background-color: #f1f5f9 !important;
+}
+html.light main .bg-gray-900 {
+  background-color: #ffffff !important;
+}
+html.light main .bg-gray-800 {
+  background-color: #f8fafc !important;
+}
+html.light main .bg-gray-700 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light main [class~="bg-gray-900/60"],
+html.light main [class~="bg-gray-900/50"],
+html.light main [class~="bg-gray-900/40"] {
+  background-color: #ffffff !important;
+}
+html.light main [class~="bg-gray-800/60"],
+html.light main [class~="bg-gray-800/50"],
+html.light main [class~="bg-gray-800/40"] {
+  background-color: #f8fafc !important;
+}
+html.light main [class~="bg-gray-700/60"],
+html.light main [class~="bg-gray-700/50"],
+html.light main [class~="bg-gray-700/40"] {
+  background-color: #e2e8f0 !important;
+}
+
+html.light main .border-gray-800 {
+  border-color: #e2e8f0 !important;
+}
+html.light main .border-gray-700 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light main .text-white {
+  color: #0f172a !important;
+}
+html.light main .text-gray-100 {
+  color: #1e293b !important;
+}
+html.light main .text-gray-200 {
+  color: #334155 !important;
+}
+html.light main .text-gray-300 {
+  color: #374151 !important;
+}
+html.light main .text-gray-400 {
+  color: #4b5563 !important;
+}
+html.light main .text-gray-500 {
+  color: #6b7280 !important;
+}
+html.light main .text-gray-600 {
+  color: #9ca3af !important;
+}
+
+html.light main .hover\:bg-gray-800:hover {
+  background-color: #f1f5f9 !important;
+}
+html.light main .hover\:bg-gray-700:hover {
+  background-color: #e2e8f0 !important;
+}
+html.light main .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+html.light main input,
+html.light main select,
+html.light main textarea {
+  color-scheme: light;
+  color: #0f172a !important;
+}
+
+html.light .fixed .bg-gray-900 {
+  background-color: #ffffff !important;
+}
+html.light .fixed .bg-gray-800 {
+  background-color: #f8fafc !important;
+}
+html.light .fixed .bg-gray-700 {
+  background-color: #e2e8f0 !important;
+}
+html.light .fixed [class~="bg-gray-900/60"],
+html.light .fixed [class~="bg-gray-900/50"],
+html.light .fixed [class~="bg-gray-900/40"] {
+  background-color: #ffffff !important;
+}
+html.light .fixed [class~="bg-gray-800/60"],
+html.light .fixed [class~="bg-gray-800/50"],
+html.light .fixed [class~="bg-gray-800/40"] {
+  background-color: #f8fafc !important;
+}
+html.light .fixed [class~="bg-gray-700/60"],
+html.light .fixed [class~="bg-gray-700/50"],
+html.light .fixed [class~="bg-gray-700/40"] {
+  background-color: #e2e8f0 !important;
+}
+html.light .fixed .border-gray-800 {
+  border-color: #e2e8f0 !important;
+}
+html.light .fixed .border-gray-700 {
+  border-color: #cbd5e1 !important;
+}
+html.light .fixed .text-white {
+  color: #0f172a !important;
+}
+html.light .fixed .text-gray-200 {
+  color: #334155 !important;
+}
+html.light .fixed .text-gray-300 {
+  color: #374151 !important;
+}
+html.light .fixed .text-gray-400 {
+  color: #4b5563 !important;
+}
+html.light .fixed .text-gray-500 {
+  color: #6b7280 !important;
+}
+html.light .fixed .text-gray-600 {
+  color: #9ca3af !important;
+}
+html.light .fixed .hover\:bg-gray-800:hover {
+  background-color: #f1f5f9 !important;
+}
+html.light .fixed .hover\:bg-gray-700:hover {
+  background-color: #e2e8f0 !important;
+}
+html.light .fixed .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+html.light .fixed input,
+html.light .fixed select,
+html.light .fixed textarea {
+  color-scheme: light;
+  color: #0f172a !important;
+}
+
+/* Tekst op gekleurde knoppen blijft altijd wit */
+html.light main .bg-amber-600.text-white,
+html.light main .bg-amber-600 .text-white,
+html.light .fixed .bg-amber-600.text-white,
+html.light .fixed .bg-amber-600 .text-white,
+html.light main .bg-amber-500.text-white,
+html.light main .bg-blue-600.text-white,
+html.light main .bg-red-600.text-white,
+html.light main .bg-green-600.text-white,
+html.light main .bg-emerald-600.text-white {
+  color: #ffffff !important;
+}
