@@ -69,7 +69,7 @@ function AlleBestanden() {
           </div>
         </div>
       ))}
-      {deel && <DeelDialog bestand={deel} onClose={() => setDeel(null)} onWijziging={laad} />}
+      {deel && <DeelDialog doel={{ soort: 'bestand', id: deel.id, naam: deel.originele_naam }} onClose={() => setDeel(null)} onWijziging={laad} />}
     </div>
   )
 }

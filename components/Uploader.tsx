@@ -24,7 +24,7 @@ async function postChunk(uploadId: string, offset: number, blob: Blob): Promise<
   return { ok: r.ok, ontvangen: d.ontvangen, status: r.status }
 }
 
-export default function Uploader({ onKlaar }: { onKlaar: () => void }) {
+export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => void; mapId?: number | null }) {
   const [taken, setTaken] = useState<Taak[]>([])
   const [sleep, setSleep] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -40,7 +40,7 @@ export default function Uploader({ onKlaar }: { onKlaar: () => void }) {
       const startR = await fetch('/api/upload/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ naam: file.name, grootte: file.size, mime: file.type || 'application/octet-stream' }),
+        body: JSON.stringify({ naam: file.name, grootte: file.size, mime: file.type || 'application/octet-stream', map_id: mapId }),
       })
       const startD = await startR.json()
       if (!startR.ok) throw new Error(startD.error || 'Kon upload niet starten')
@@ -77,7 +77,7 @@ export default function Uploader({ onKlaar }: { onKlaar: () => void }) {
     } catch (e) {
       update(taakId, { status: 'fout', fout: e instanceof Error ? e.message : 'Onbekende fout' })
     }
-  }, [onKlaar, update])
+  }, [onKlaar, update, mapId])
 
   const voegToe = useCallback(async (files: FileList | File[]) => {
     const lijst = Array.from(files)

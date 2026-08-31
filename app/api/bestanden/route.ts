@@ -30,6 +30,24 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ bestanden: rijen, alle })
 }
 
+// Bestand verplaatsen naar een (andere) map. map_id = null → hoofdmap.
+export async function PATCH(req: NextRequest) {
+  const g = await huidigeGebruiker()
+  if (!g) return nietIngelogd()
+  const { id, map_id } = await req.json()
+  const db = getDb()
+  const b = db.prepare('SELECT eigenaar_id FROM bestand WHERE id = ?').get(id) as { eigenaar_id: number } | undefined
+  if (!b) return NextResponse.json({ error: 'Niet gevonden' }, { status: 404 })
+  if (b.eigenaar_id !== g.id && !g.is_admin) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
+
+  const doelMap = map_id != null ? Number(map_id) : null
+  if (doelMap != null && !db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(doelMap, b.eigenaar_id)) {
+    return NextResponse.json({ error: 'Doelmap niet gevonden' }, { status: 400 })
+  }
+  db.prepare('UPDATE bestand SET map_id = ? WHERE id = ?').run(doelMap, id)
+  return NextResponse.json({ ok: true })
+}
+
 // Bestand verwijderen (eigenaar of beheerder) — incl. bestand op schijf.
 export async function DELETE(req: NextRequest) {
   const g = await huidigeGebruiker()

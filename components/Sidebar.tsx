@@ -7,6 +7,7 @@ import { useGebruiker } from './AuthGate'
 const NAV = [
   { href: '/', label: 'Mijn bestanden', icon: '📁' },
   { href: '/gedeeld', label: 'Gedeeld met mij', icon: '📥' },
+  { href: '/groepen', label: 'Groepen', icon: '👥' },
   { href: '/instellingen', label: 'Instellingen', icon: '⚙️' },
 ]
 const ADMIN_ITEM = { href: '/beheer', label: 'Beheer', icon: '🛡️' }

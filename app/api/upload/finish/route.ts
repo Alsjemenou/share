@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   const db = getDb()
   const s = db.prepare('SELECT * FROM upload_sessie WHERE upload_id = ? AND eigenaar_id = ?').get(id, g.id) as
-    | { upload_id: string; originele_naam: string; mime: string; grootte: number; tmp_pad: string }
+    | { upload_id: string; originele_naam: string; mime: string; grootte: number; tmp_pad: string; map_id: number | null }
     | undefined
   if (!s) return NextResponse.json({ error: 'Upload niet gevonden' }, { status: 404 })
 
@@ -41,10 +41,14 @@ export async function POST(req: NextRequest) {
     try { fs.unlinkSync(s.tmp_pad) } catch { /* nvt */ }
   }
 
+  // Map nog geldig? (kan verwijderd zijn tijdens de upload) → anders hoofdmap.
+  const mapId = s.map_id != null && db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(s.map_id, g.id)
+    ? s.map_id : null
+
   const r = db.prepare(`
-    INSERT INTO bestand (eigenaar_id, opgeslagen_naam, originele_naam, mime, grootte)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(g.id, opgeslagenNaam, s.originele_naam, s.mime, s.grootte)
+    INSERT INTO bestand (eigenaar_id, opgeslagen_naam, originele_naam, mime, grootte, map_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(g.id, opgeslagenNaam, s.originele_naam, s.mime, s.grootte, mapId)
 
   db.prepare('DELETE FROM upload_sessie WHERE upload_id = ?').run(s.upload_id)
 

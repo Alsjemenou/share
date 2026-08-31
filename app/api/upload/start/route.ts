@@ -25,21 +25,31 @@ export async function POST(req: NextRequest) {
 
   ruimOudeSessiesOp()
 
-  const { naam, grootte, mime } = await req.json()
+  const { naam, grootte, mime, map_id } = await req.json()
   const totaal = Number(grootte)
   if (!naam || !Number.isFinite(totaal) || totaal < 0) {
     return NextResponse.json({ error: 'Ongeldige upload-gegevens' }, { status: 400 })
+  }
+
+  const db = getDb()
+
+  // Optioneel: in welke (eigen) map komt het bestand?
+  let mapId: number | null = null
+  if (map_id != null) {
+    mapId = Number(map_id)
+    if (!db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(mapId, g.id)) {
+      return NextResponse.json({ error: 'Doelmap niet gevonden' }, { status: 400 })
+    }
   }
 
   const uploadId = crypto.randomUUID()
   const tmpPad = path.join(UPLOAD_TMP_DIR, `${uploadId}.part`)
   fs.writeFileSync(tmpPad, Buffer.alloc(0))
 
-  const db = getDb()
   db.prepare(`
-    INSERT INTO upload_sessie (upload_id, eigenaar_id, originele_naam, mime, grootte, ontvangen_bytes, tmp_pad)
-    VALUES (?, ?, ?, ?, ?, 0, ?)
-  `).run(uploadId, g.id, String(naam), String(mime || 'application/octet-stream'), totaal, tmpPad)
+    INSERT INTO upload_sessie (upload_id, eigenaar_id, originele_naam, mime, grootte, ontvangen_bytes, tmp_pad, map_id)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+  `).run(uploadId, g.id, String(naam), String(mime || 'application/octet-stream'), totaal, tmpPad, mapId)
 
   return NextResponse.json({ upload_id: uploadId, ontvangen: 0 })
 }

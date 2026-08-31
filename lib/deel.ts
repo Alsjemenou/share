@@ -52,13 +52,67 @@ export function linkOngeldigReden(link: DeelLink): string | null {
   return null
 }
 
+// Deelt de map (of een van zijn voorouders) toegang uit aan deze gebruiker —
+// direct op zijn account of via een groep waar hij lid van is? Werkt op een
+// map-id-keten (voorouders) die de aanroeper aanlevert via de CTE-startset.
+const DEEL_MAP_MATCH = `
+  SELECT 1 FROM deel_map dm WHERE dm.map_id IN (SELECT id FROM keten) AND (
+    (dm.ontvanger_type = 'account' AND dm.ontvanger_id = @u)
+    OR (dm.ontvanger_type = 'groep' AND dm.ontvanger_id IN (SELECT groep_id FROM groep_lid WHERE gebruiker_id = @u))
+  ) LIMIT 1
+`
+
 // Mag deze (ingelogde) gebruiker dit bestand zien/downloaden?
-// Eigenaar | beheerder | expliciet gedeeld naar dit account.
+// Eigenaar | beheerder | direct met account gedeeld | via groep gedeeld |
+// het bestand zit in een (voorouder)map die met de gebruiker/zijn groep gedeeld is.
 export function magBestandZien(g: Gebruiker, bestandId: number): boolean {
   if (g.is_admin) return true
   const db = getDb()
-  const eigen = db.prepare('SELECT 1 FROM bestand WHERE id = ? AND eigenaar_id = ?').get(bestandId, g.id)
-  if (eigen) return true
-  const gedeeld = db.prepare('SELECT 1 FROM deel_account WHERE bestand_id = ? AND gebruiker_id = ?').get(bestandId, g.id)
-  return !!gedeeld
+  if (db.prepare('SELECT 1 FROM bestand WHERE id = ? AND eigenaar_id = ?').get(bestandId, g.id)) return true
+  if (db.prepare('SELECT 1 FROM deel_account WHERE bestand_id = ? AND gebruiker_id = ?').get(bestandId, g.id)) return true
+  if (db.prepare(
+    `SELECT 1 FROM deel_groep dg JOIN groep_lid gl ON gl.groep_id = dg.groep_id
+     WHERE dg.bestand_id = ? AND gl.gebruiker_id = ?`
+  ).get(bestandId, g.id)) return true
+  // Via de mappenketen (bestand → map → oudermap → …).
+  const viaMap = db.prepare(`
+    WITH RECURSIVE keten(id) AS (
+      SELECT map_id FROM bestand WHERE id = @f AND map_id IS NOT NULL
+      UNION
+      SELECT m.ouder_id FROM map m JOIN keten k ON m.id = k.id WHERE m.ouder_id IS NOT NULL
+    )
+    ${DEEL_MAP_MATCH}
+  `).get({ f: bestandId, u: g.id })
+  return !!viaMap
+}
+
+// Mag deze gebruiker deze map inzien/bladeren?
+// Eigenaar | beheerder | de map of een voorouder is met de gebruiker/zijn groep gedeeld.
+export function magMapZien(g: Gebruiker, mapId: number): boolean {
+  if (g.is_admin) return true
+  const db = getDb()
+  const m = db.prepare('SELECT eigenaar_id FROM map WHERE id = ?').get(mapId) as { eigenaar_id: number } | undefined
+  if (!m) return false
+  if (m.eigenaar_id === g.id) return true
+  const via = db.prepare(`
+    WITH RECURSIVE keten(id) AS (
+      SELECT @m
+      UNION
+      SELECT mm.ouder_id FROM map mm JOIN keten k ON mm.id = k.id WHERE mm.ouder_id IS NOT NULL
+    )
+    ${DEEL_MAP_MATCH}
+  `).get({ m: mapId, u: g.id })
+  return !!via
+}
+
+// Beheerrecht (delen/hernoemen/verplaatsen/verwijderen): eigenaar of beheerder.
+export function magBestandBeheren(g: Gebruiker, bestandId: number): boolean {
+  if (g.is_admin) return true
+  const db = getDb()
+  return !!db.prepare('SELECT 1 FROM bestand WHERE id = ? AND eigenaar_id = ?').get(bestandId, g.id)
+}
+export function magMapBeheren(g: Gebruiker, mapId: number): boolean {
+  if (g.is_admin) return true
+  const db = getDb()
+  return !!db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(mapId, g.id)
 }

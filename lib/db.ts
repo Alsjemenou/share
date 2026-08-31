@@ -124,6 +124,73 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_downloadlog_bestand ON download_log(bestand_id);
   `)
 
+  // ── Mappen (geneste projectmappen) ────────────────────────────────────────────
+  // Een map hoort bij één eigenaar en kan een oudermap hebben (nesting).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS map (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      eigenaar_id INTEGER NOT NULL REFERENCES gebruiker(id) ON DELETE CASCADE,
+      naam TEXT NOT NULL,
+      ouder_id INTEGER REFERENCES map(id) ON DELETE CASCADE,  -- NULL = in de hoofdmap
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_map_eigenaar ON map(eigenaar_id, ouder_id);
+  `)
+
+  // Bestand kan in een map staan (NULL = hoofdmap). Verwijderen van een map zet
+  // de bestanden terug naar de hoofdmap (SET NULL), niet weggooien.
+  const bCols = db.prepare('PRAGMA table_info(bestand)').all() as { name: string }[]
+  if (!bCols.some(c => c.name === 'map_id')) {
+    db.exec('ALTER TABLE bestand ADD COLUMN map_id INTEGER REFERENCES map(id) ON DELETE SET NULL')
+  }
+
+  // ── Groepen (elke gebruiker beheert zijn eigen groepen) ───────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS groep (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      eigenaar_id INTEGER NOT NULL REFERENCES gebruiker(id) ON DELETE CASCADE,
+      naam TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS groep_lid (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      groep_id INTEGER NOT NULL REFERENCES groep(id) ON DELETE CASCADE,
+      gebruiker_id INTEGER NOT NULL REFERENCES gebruiker(id) ON DELETE CASCADE,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(groep_id, gebruiker_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_groeplid_gebruiker ON groep_lid(gebruiker_id);
+  `)
+
+  // ── Bestand gedeeld met een groep ─────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS deel_groep (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bestand_id INTEGER NOT NULL REFERENCES bestand(id) ON DELETE CASCADE,
+      groep_id INTEGER NOT NULL REFERENCES groep(id) ON DELETE CASCADE,
+      gedeeld_door INTEGER REFERENCES gebruiker(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(bestand_id, groep_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_deelgroep_groep ON deel_groep(groep_id);
+  `)
+
+  // ── Map gedeeld met een account of groep ──────────────────────────────────────
+  // Deelt de hele (sub)boom: alle bestanden in de map en submappen, ook later
+  // toegevoegde. ontvanger_type bepaalt of ontvanger_id een gebruiker of groep is.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS deel_map (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      map_id INTEGER NOT NULL REFERENCES map(id) ON DELETE CASCADE,
+      ontvanger_type TEXT NOT NULL,        -- 'account' | 'groep'
+      ontvanger_id INTEGER NOT NULL,
+      gedeeld_door INTEGER REFERENCES gebruiker(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(map_id, ontvanger_type, ontvanger_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_deelmap_map ON deel_map(map_id);
+  `)
+
   // ── Lopende uploads (hervatbaar / chunked) ────────────────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS upload_sessie (
@@ -137,4 +204,9 @@ function migrate(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `)
+  // map_id op upload_sessie: in welke map de upload terechtkomt (NULL = hoofdmap).
+  const uCols = db.prepare('PRAGMA table_info(upload_sessie)').all() as { name: string }[]
+  if (!uCols.some(c => c.name === 'map_id')) {
+    db.exec('ALTER TABLE upload_sessie ADD COLUMN map_id INTEGER')
+  }
 }
