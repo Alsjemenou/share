@@ -8,7 +8,7 @@ module.exports = {
       args: 'start',
       cwd: __dirname,
       env: {
-        PORT: '3003',
+        PORT: '3005',
         NODE_ENV: 'production',
       },
       max_memory_restart: '500M',

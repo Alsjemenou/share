@@ -17,7 +17,7 @@ better-sqlite3 (WAL), Tailwind v4, PM2 + Nginx**.
 
 ## Adres & poort
 
-- Intern: **poort 3003**
+- Intern: **poort 3005**
 - Adres: **share.local / 192.168.2.42**
 
 ## Lokaal draaien (ontwikkeling)
@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3003>. Bij het eerste bezoek maak je het beheerdersaccount aan.
+Open <http://localhost:3005>. Bij het eerste bezoek maak je het beheerdersaccount aan.
 
 ## Installeren op de server
 

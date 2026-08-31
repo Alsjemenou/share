@@ -8,7 +8,7 @@ Deel — een webapp om **bestanden te delen**: als eigen NAS-/WeTransfer-vervang
 aan internet bloot te stellen. Zusje van `financieel-dashboard`, `boekhouding` en `sport`; zelfde
 stack: Next.js 16, React 19, better-sqlite3, Tailwind v4, PM2 + Nginx.
 
-- Draait intern op **poort 3003** (finance = 3000, boekhouding = 3001, sport = 3002 op dezelfde host).
+- Draait intern op **poort 3005** (op dezelfde host, naast finance 3000, boekhouding 3001, sport 3002, vmware 3003, sauman 3004).
 - Bereikbaar via **share.local / 192.168.2.42**.
 - Database: `data/share.db` (SQLite, WAL).
 - Bestanden: `data/bestanden/<eigenaar_id>/…` — **bewust buiten `public/`** (privé).

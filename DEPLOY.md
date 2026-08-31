@@ -1,7 +1,7 @@
 # 🚀 Deel — Installatiehandleiding
 
 Deze app draait op **dezelfde host** als finance, boekhouding en sport, maar op een **eigen interne
-poort (3003)** en met een eigen adres: **share.local / 192.168.2.42**. Ze delen niets — eigen
+poort (3005)** en met een eigen adres: **share.local / 192.168.2.42**. Ze delen niets — eigen
 database, eigen Nginx-site.
 
 ---
@@ -13,7 +13,7 @@ database, eigen Nginx-site.
 - Ongeveer **10 minuten**.
 - Voldoende **schijfruimte** voor de bestanden die je gaat delen (dit is je NAS-vervanger!).
 
-> Finance = 3000, Boekhouding = 3001, Sport = 3002, Deel = 3003 — ze bijten elkaar dus niet.
+> Finance = 3000, Boekhouding = 3001, Sport = 3002, vmware = 3003, Sauman = 3004, Deel = 3005 — ze bijten elkaar dus niet.
 
 ---
 
@@ -29,7 +29,7 @@ Het script stelt een paar korte vragen (standaardwaarde tussen `[ ]` — Enter =
 ```
 Hostnaam/IP waarop de site draait [share.local 192.168.2.42]:
 Installatiemap [/opt/share]:
-Nginx installeren (adres zonder :3003) (yes/no) [yes]:
+Nginx installeren (adres zonder :3005) (yes/no) [yes]:
 Doorgaan met installeren? (yes/no) [yes]:
 ```
 
@@ -39,7 +39,8 @@ Nginx-site aanmaken zodat je de app op `http://share.local/` opent.
 ### DNS / hosts
 
 Zorg dat **share.local** naar **192.168.2.42** wijst (A-record op je router/DNS, of in het
-hosts-bestand). **Deze DNS-regel moet nog toegevoegd worden.**
+hosts-bestand). Op de gedeelde host `finance` (192.168.2.49) heeft de app bovendien een eigen
+IP-alias `192.168.2.42` op `eth0` (in `/etc/network/interfaces`), net als de andere apps.
 
 ### Instellingen vooraf meegeven (optioneel)
 
@@ -47,7 +48,7 @@ hosts-bestand). **Deze DNS-regel moet nog toegevoegd worden.**
 |---|---|---|
 | `SERVER_NAME` | Hostnaam(en)/IP | `share.local 192.168.2.42` |
 | `APP_DIR` | Installatiemap | `/opt/share` |
-| `APP_PORT` | Interne poort | `3003` |
+| `APP_PORT` | Interne poort | `3005` |
 | `REPO_URL` | Git-adres | de standaard repo |
 | `SETUP_NGINX` | Nginx installeren | `yes` |
 | `MAX_BODY` | Max. grootte per upload-chunk (Nginx) | `100M` |
@@ -66,7 +67,7 @@ pm2 start ecosystem.config.js
 pm2 save
 ```
 
-Nginx-site (poort 80 → 3003) — **let op: geen statische bestandslocatie**, bestanden zijn privé.
+Nginx-site (poort 80 → 3005) — **let op: geen statische bestandslocatie**, bestanden zijn privé.
 `proxy_request_buffering off` + ruime timeouts zijn belangrijk voor grote uploads:
 
 ```nginx
@@ -80,7 +81,7 @@ server {
     proxy_send_timeout 3600s;
 
     location / {
-        proxy_pass http://localhost:3003;
+        proxy_pass http://localhost:3005;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

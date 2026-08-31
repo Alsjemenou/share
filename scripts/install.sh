@@ -3,8 +3,9 @@
 # Deel — installatie op een server (Debian 12/13 of Ubuntu 22.04+).
 # Draai dit script als root:   sudo bash install.sh
 #
-# Draait naast finance (3000), boekhouding (3001) en sport (3002) op DEZELFDE host:
-# interne poort 3003. Je kunt instellingen vooraf meegeven, bijvoorbeeld:
+# Draait naast de andere apps op DEZELFDE host (finance 3000, boekhouding 3001,
+# sport 3002, vmware 3003, sauman 3004): interne poort 3005. Je kunt instellingen
+# vooraf meegeven, bijvoorbeeld:
 #   SERVER_NAME="share.local 192.168.2.42" sudo -E bash install.sh
 #
 set -euo pipefail
@@ -15,7 +16,7 @@ _NGINX_SET="${SETUP_NGINX+x}"
 
 REPO_URL="${REPO_URL:-https://github.com/Alsjemenou/share.git}"
 APP_DIR="${APP_DIR:-/opt/share}"
-APP_PORT="${APP_PORT:-3003}"
+APP_PORT="${APP_PORT:-3005}"
 SERVER_NAME="${SERVER_NAME:-share.local 192.168.2.42}"
 NODE_MAJOR="${NODE_MAJOR:-20}"
 SETUP_NGINX="${SETUP_NGINX:-yes}"
