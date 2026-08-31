@@ -1,0 +1,2 @@
+# Zorg dat shell-scripts altijd LF-regeleindes houden (draaien op Linux-server).
+*.sh text eol=lf
