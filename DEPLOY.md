@@ -154,12 +154,18 @@ Je kunt de **bestanden** en de **upload-temp** op een netwerk-share zetten; de *
    mount /mnt/share-opslag
    mkdir -p /mnt/share-opslag/bestanden /mnt/share-opslag/uploads-tmp
    ```
-4. Wijs de app naar de mount via env (in `ecosystem.config.js`, of een pm2-env):
-   ```
+4. Wijs de app naar de mount via `data/storage.env` (gitignored; `ecosystem.config.js` leest dit
+   automatisch en zet het in de proces-env — betrouwbaarder dan een `.env`-bestand):
+   ```bash
+   cat > /opt/share/data/storage.env <<EOF
    SHARE_BESTAND_DIR=/mnt/share-opslag/bestanden
    SHARE_UPLOAD_TMP_DIR=/mnt/share-opslag/uploads-tmp
+   EOF
+   pm2 delete share && pm2 start /opt/share/ecosystem.config.js && pm2 save
    ```
-   Daarna `pm2 restart share --update-env && pm2 save`.
+   (Een `pm2 restart` alleen pikt nieuwe env niet op — daarom `delete` + `start` via het
+   ecosystem-bestand.) Migreer bestaande uploads eenmalig:
+   `cp -a /opt/share/data/bestanden/. /mnt/share-opslag/bestanden/`.
 
 > Zet **beide** paden op dezelfde mount: het afronden van een upload is dan een goedkope *move* i.p.v.
 > een kopie. De database + `data/uploads-tmp` op de lokale schijf blijven zo verwaarloosbaar klein;
