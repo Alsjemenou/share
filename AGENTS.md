@@ -10,9 +10,10 @@ stack: Next.js 16, React 19, better-sqlite3, Tailwind v4, PM2 + Nginx.
 
 - Draait intern op **poort 3005** (op dezelfde host, naast finance 3000, boekhouding 3001, sport 3002, vmware 3003, sauman 3004).
 - Bereikbaar via **share.local / 192.168.2.42**.
-- Database: `data/share.db` (SQLite, WAL).
+- Database: `data/share.db` (SQLite, WAL) — **blijft altijd lokaal** (netwerk-shares zijn onbetrouwbaar voor SQLite-locking).
 - Bestanden: `data/bestanden/<eigenaar_id>/…` — **bewust buiten `public/`** (privé).
 - Lopende (hervatbare) uploads: `data/uploads-tmp/`.
+- **Opslag verplaatsbaar** (bijv. naar een SMB/CIFS-mount, zodat de lokale schijf klein blijft): zet `SHARE_BESTAND_DIR` en `SHARE_UPLOAD_TMP_DIR` (in `lib/db.ts`). Zet ze op **dezelfde** mount, want `finish` doet een `rename` (goedkope move binnen één filesystem; cross-fs valt terug op kopiëren). Zie DEPLOY.md.
 
 ## Twee manieren van delen
 

@@ -127,6 +127,44 @@ Alles onder `data/` staat buiten versiebeheer. De **ingebouwde back-up** (Beheer
 alléén de database — niet de bestanden, want die kunnen tientallen GB's zijn. Neem de map
 `data/bestanden/` mee in je **reguliere (versleutelde) back-up** van de server.
 
+## 📡 Bestanden op een SMB/CIFS-share (lokale schijf klein houden)
+
+Je kunt de **bestanden** en de **upload-temp** op een netwerk-share zetten; de **database blijft lokaal**
+(SQLite werkt niet betrouwbaar over een share). De app schrijft gewoon naar een pad — dat pad is een mount.
+
+1. Pakket + map:
+   ```bash
+   apt-get install -y cifs-utils
+   mkdir -p /mnt/share-opslag
+   ```
+2. Inloggegevens in een root-only bestand (vul zelf je wachtwoord in):
+   ```bash
+   umask 077; cat > /etc/cifs-share.cred <<EOF
+   username=DEIN_SMB_GEBRUIKER
+   password=DEIN_SMB_WACHTWOORD
+   EOF
+   chmod 600 /etc/cifs-share.cred
+   ```
+3. `/etc/fstab`-regel (pas host/share aan). `nofail` voorkomt dat de server hangt bij boot als de
+   share even weg is; `_netdev` wacht op het netwerk:
+   ```
+   //NAS-HOST/share  /mnt/share-opslag  cifs  credentials=/etc/cifs-share.cred,uid=0,gid=0,file_mode=0640,dir_mode=0750,vers=3.0,nofail,_netdev  0  0
+   ```
+   ```bash
+   mount /mnt/share-opslag
+   mkdir -p /mnt/share-opslag/bestanden /mnt/share-opslag/uploads-tmp
+   ```
+4. Wijs de app naar de mount via env (in `ecosystem.config.js`, of een pm2-env):
+   ```
+   SHARE_BESTAND_DIR=/mnt/share-opslag/bestanden
+   SHARE_UPLOAD_TMP_DIR=/mnt/share-opslag/uploads-tmp
+   ```
+   Daarna `pm2 restart share --update-env && pm2 save`.
+
+> Zet **beide** paden op dezelfde mount: het afronden van een upload is dan een goedkope *move* i.p.v.
+> een kopie. De database + `data/uploads-tmp` op de lokale schijf blijven zo verwaarloosbaar klein;
+> alleen de echte uploads staan op de NAS.
+
 ## 🛠️ Handige commando's
 
 | Wat | Commando |

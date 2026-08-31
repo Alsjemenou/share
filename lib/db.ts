@@ -2,15 +2,26 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
 
+// De SQLite-database blijft ALTIJD lokaal (netwerk-shares zijn onbetrouwbaar voor
+// SQLite-locking/WAL). Alleen de bestanden + upload-temp mogen elders staan.
 const DB_DIR = path.join(process.cwd(), 'data')
 const DB_PATH = path.join(DB_DIR, 'share.db')
 
 // Privémap voor geüploade bestanden — bewust BUITEN public/ zodat Nginx ze niet
 // statisch serveert. Bestanden gaan alleen via routes die login/eigenaarschap of
 // een geldige deel-link controleren.
-const BESTAND_DIR = path.join(DB_DIR, 'bestanden')
+//
+// Opslag is te verplaatsen (bijv. naar een SMB/CIFS-mount) via env-vars, zodat de
+// lokale schijf klein blijft. Zet BESTAND_DIR en UPLOAD_TMP_DIR bij voorkeur op
+// DEZELFDE mount: het afronden van een upload is dan een goedkope 'move' i.p.v. een
+// kopie over filesystems heen.
+const BESTAND_DIR = process.env.SHARE_BESTAND_DIR
+  ? path.resolve(process.env.SHARE_BESTAND_DIR)
+  : path.join(DB_DIR, 'bestanden')
 // Tijdelijke map voor lopende (hervatbare) uploads.
-const UPLOAD_TMP_DIR = path.join(DB_DIR, 'uploads-tmp')
+const UPLOAD_TMP_DIR = process.env.SHARE_UPLOAD_TMP_DIR
+  ? path.resolve(process.env.SHARE_UPLOAD_TMP_DIR)
+  : path.join(DB_DIR, 'uploads-tmp')
 
 let _db: Database.Database | null = null
 
