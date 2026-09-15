@@ -1,7 +1,7 @@
 'use client'
 import { use, useEffect, useState } from 'react'
 
-type Merk = { naam: string | null; subtitel: string | null; kleur: string | null; heeft_logo: boolean; logo_id: number | null }
+type Merk = { naam: string | null; subtitel: string | null; kleur: string | null; heeft_logo: boolean; logo_id: number | null; heeft_achtergrond: boolean; achtergrond_id: number | null }
 type Info = { gebruikersnaam: string; weergavenaam: string; aantal_bestanden: number; merk: Merk | null }
 
 export default function UitnodigingPage({ params }: { params: Promise<{ token: string }> }) {
@@ -39,9 +39,10 @@ export default function UitnodigingPage({ params }: { params: Promise<{ token: s
   const merk = info?.merk || null
   const heeftMerk = !!(merk && (merk.naam || merk.heeft_logo || merk.kleur))
   const logoUrl = merk?.heeft_logo && merk.logo_id != null ? `/api/merk/${merk.logo_id}/logo` : null
+  const achtergrondUrl = merk?.heeft_achtergrond && merk.achtergrond_id != null ? `/api/merk/${merk.achtergrond_id}/achtergrond` : null
 
   const Kaart = ({ children }: { children: React.ReactNode }) => (
-    <div className={`w-full max-w-sm ${merk?.kleur ? 'merk' : ''}`} style={merk?.kleur ? ({ ['--brand']: merk.kleur } as React.CSSProperties) : undefined}>
+    <div className={`relative z-10 w-full max-w-sm ${merk?.kleur ? 'merk' : ''}`} style={merk?.kleur ? ({ ['--brand']: merk.kleur } as React.CSSProperties) : undefined}>
       {heeftMerk ? (
         <div className="rounded-t-2xl px-5 py-4 flex items-center gap-3" style={{ backgroundColor: merk?.kleur || '#111827' }}>
           {logoUrl ? <img src={logoUrl} alt="" className="h-9 w-9 object-contain rounded bg-white/20 p-0.5" /> : <span className="text-2xl">📤</span>}
@@ -57,11 +58,23 @@ export default function UitnodigingPage({ params }: { params: Promise<{ token: s
     </div>
   )
 
-  if (laden) return <Kaart><div className="text-center text-gray-500 text-sm py-4">Laden…</div></Kaart>
-  if (fout && !info) return <Kaart><div className="text-center"><div className="text-3xl mb-2">🚫</div><div className="text-sm text-gray-300">{fout}</div></div></Kaart>
-  if (klaar) return <Kaart><div className="text-center text-sm text-gray-300 py-4">Welkom! Je wordt doorgestuurd…</div></Kaart>
+  const wrap = (n: React.ReactNode) => (
+    <>
+      {achtergrondUrl && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <img src={achtergrondUrl} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/55" />
+        </div>
+      )}
+      {n}
+    </>
+  )
 
-  return (
+  if (laden) return wrap(<Kaart><div className="text-center text-gray-500 text-sm py-4">Laden…</div></Kaart>)
+  if (fout && !info) return wrap(<Kaart><div className="text-center"><div className="text-3xl mb-2">🚫</div><div className="text-sm text-gray-300">{fout}</div></div></Kaart>)
+  if (klaar) return wrap(<Kaart><div className="text-center text-sm text-gray-300 py-4">Welkom! Je wordt doorgestuurd…</div></Kaart>)
+
+  return wrap(
     <Kaart>
       <h2 className="font-semibold mb-1">Je bent uitgenodigd</h2>
       <p className="text-sm text-gray-400 mb-4">

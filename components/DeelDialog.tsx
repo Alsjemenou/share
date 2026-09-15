@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { formatDatum, formatDatumKort } from '@/lib/format'
 
 export type DeelDoel = { soort: 'bestand' | 'map'; id: number; naam: string }
-type Props = { doel: DeelDoel; onClose: () => void; onWijziging?: () => void }
+type Props = { doel: DeelDoel; onClose: () => void; onWijziging?: () => void; initieelTab?: 'delen' | 'link' | 'downloads' }
 
 type Link = {
   id: number; token: string; verloopt_op: string | null; max_downloads: number | null
@@ -26,9 +26,9 @@ function KopieerKnop({ tekst }: { tekst: string }) {
   )
 }
 
-export default function DeelDialog({ doel, onClose, onWijziging }: Props) {
+export default function DeelDialog({ doel, onClose, onWijziging, initieelTab }: Props) {
   const isBestand = doel.soort === 'bestand'
-  const [tab, setTab] = useState<'delen' | 'link' | 'downloads'>('delen')
+  const [tab, setTab] = useState<'delen' | 'link' | 'downloads'>(isBestand && initieelTab ? initieelTab : 'delen')
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
   const tabs: [typeof tab, string][] = isBestand
@@ -226,45 +226,64 @@ function LinkTab({ bestandId, origin, onWijziging }: { bestandId: number; origin
   async function toggle(l: Link) { await fetch('/api/deel/link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, actief: l.actief ? 0 : 1 }) }); await laad(); onWijziging?.() }
   async function wis(l: Link) { if (!confirm('Deze link verwijderen?')) return; await fetch('/api/deel/link', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id }) }); await laad(); onWijziging?.() }
 
+  const [toonNieuw, setToonNieuw] = useState(false)
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm"><span className="block text-xs text-gray-400 mb-1">Wachtwoord (optioneel)</span>
-          <input value={wachtwoord} onChange={e => setWachtwoord(e.target.value)} placeholder="geen" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
-        <label className="text-sm"><span className="block text-xs text-gray-400 mb-1">Verloopt na</span>
-          <select value={verloop} onChange={e => setVerloop(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
-            <option value="0">Nooit</option><option value="1">1 dag</option><option value="7">7 dagen</option><option value="30">30 dagen</option><option value="90">90 dagen</option>
-          </select></label>
-        <label className="text-sm col-span-2"><span className="block text-xs text-gray-400 mb-1">Max. aantal downloads (optioneel)</span>
-          <input value={maxDl} onChange={e => setMaxDl(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="onbeperkt" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
-      </div>
-      {fout && <div className="text-sm text-red-400">{fout}</div>}
-      <button onClick={maak} disabled={bezig} className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm">{bezig ? 'Even geduld…' : 'Deel-link aanmaken'}</button>
+      {/* Bestaande links — prominent, altijd terug te vinden via 'Delen' */}
+      {links.length > 0 ? (
+        <div className="space-y-2">
+          <div className="text-xs text-gray-400">Je deel-link{links.length === 1 ? '' : 's'} — kopieer of beheer deze wanneer je maar wilt:</div>
+          {links.map(l => {
+            const url = `${origin}/d/${l.token}`
+            return (
+              <div key={l.id} className={`bg-gray-800 rounded-xl p-3 ${l.actief ? '' : 'opacity-60'}`}>
+                <div className="flex items-center gap-2">
+                  <input readOnly value={url} className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-xs" onFocus={e => e.target.select()} />
+                  <KopieerKnop tekst={url} />
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-400">
+                  <span>⬇️ {l.download_count}{l.max_downloads != null ? ` / ${l.max_downloads}` : ''}</span>
+                  {l.heeft_wachtwoord ? <span>🔒 wachtwoord</span> : null}
+                  {l.verloopt_op ? <span>⏳ tot {formatDatumKort(l.verloopt_op)}</span> : <span>♾️ geen verloop</span>}
+                  {!l.actief && <span className="text-red-400">uitgeschakeld</span>}
+                  <span className="ml-auto flex gap-2">
+                    <button onClick={() => toggle(l)} className="hover:text-white underline">{l.actief ? 'Uit' : 'Aan'}</button>
+                    <button onClick={() => wis(l)} className="hover:text-red-300 underline">Verwijder</button>
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="text-sm text-gray-500 text-center py-1">Nog geen deel-link voor dit bestand.</div>
+      )}
 
-      <div className="space-y-2 pt-2">
-        {links.length === 0 && <div className="text-sm text-gray-500 text-center py-2">Nog geen links.</div>}
-        {links.map(l => {
-          const url = `${origin}/d/${l.token}`
-          return (
-            <div key={l.id} className={`bg-gray-800 rounded-xl p-3 ${l.actief ? '' : 'opacity-60'}`}>
-              <div className="flex items-center gap-2">
-                <input readOnly value={url} className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-xs" onFocus={e => e.target.select()} />
-                <KopieerKnop tekst={url} />
-              </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-400">
-                <span>⬇️ {l.download_count}{l.max_downloads != null ? ` / ${l.max_downloads}` : ''}</span>
-                {l.heeft_wachtwoord ? <span>🔒 wachtwoord</span> : null}
-                {l.verloopt_op ? <span>⏳ tot {formatDatumKort(l.verloopt_op)}</span> : <span>♾️ geen verloop</span>}
-                {!l.actief && <span className="text-red-400">uitgeschakeld</span>}
-                <span className="ml-auto flex gap-2">
-                  <button onClick={() => toggle(l)} className="hover:text-white underline">{l.actief ? 'Uit' : 'Aan'}</button>
-                  <button onClick={() => wis(l)} className="hover:text-red-300 underline">Verwijder</button>
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {/* Nieuwe link maken (ingeklapt zodat bestaande links vooropstaan) */}
+      {!toonNieuw && (
+        <button onClick={() => setToonNieuw(true)} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2.5 text-sm">＋ Nieuwe deel-link maken</button>
+      )}
+      {toonNieuw && (
+        <div className="border border-gray-800 rounded-xl p-3 space-y-3">
+          <div className="text-xs text-gray-400">Nieuwe deel-link</div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm"><span className="block text-xs text-gray-400 mb-1">Wachtwoord (optioneel)</span>
+              <input value={wachtwoord} onChange={e => setWachtwoord(e.target.value)} placeholder="geen" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
+            <label className="text-sm"><span className="block text-xs text-gray-400 mb-1">Verloopt na</span>
+              <select value={verloop} onChange={e => setVerloop(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                <option value="0">Nooit</option><option value="1">1 dag</option><option value="7">7 dagen</option><option value="30">30 dagen</option><option value="90">90 dagen</option>
+              </select></label>
+            <label className="text-sm col-span-2"><span className="block text-xs text-gray-400 mb-1">Max. aantal downloads (optioneel)</span>
+              <input value={maxDl} onChange={e => setMaxDl(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="onbeperkt" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
+          </div>
+          {fout && <div className="text-sm text-red-400">{fout}</div>}
+          <div className="flex gap-2">
+            <button onClick={async () => { await maak(); setToonNieuw(false) }} disabled={bezig} className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2 text-sm">{bezig ? 'Even geduld…' : 'Link aanmaken'}</button>
+            <button onClick={() => setToonNieuw(false)} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2 text-sm">Annuleer</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

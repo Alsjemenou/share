@@ -76,6 +76,7 @@ function migrate(db: Database.Database) {
     if (!heeft('merk_subtitel')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_subtitel TEXT')
     if (!heeft('merk_kleur')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_kleur TEXT')
     if (!heeft('merk_logo')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_logo TEXT')
+    if (!heeft('merk_achtergrond')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_achtergrond TEXT')
     // Extra recht: mag een eigen huisstijl instellen (door beheerder toegekend).
     if (!heeft('mag_branding')) db.exec('ALTER TABLE gebruiker ADD COLUMN mag_branding INTEGER NOT NULL DEFAULT 0')
   }

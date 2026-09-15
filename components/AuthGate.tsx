@@ -18,6 +18,8 @@ export type Merk = {
   kleur: string | null
   heeft_logo: boolean
   logo_id: number | null
+  heeft_achtergrond: boolean
+  achtergrond_id: number | null
 }
 
 const GebruikerCtx = createContext<{ gebruiker: Gebruiker | null; merk: Merk | null; herlaad: () => void }>({

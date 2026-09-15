@@ -79,7 +79,7 @@ export default function InstellingenPage() {
 }
 
 // ── Huisstijl (branding) ──────────────────────────────────────────────────────
-type Merk = { naam: string | null; subtitel: string | null; kleur: string | null; heeft_logo: boolean; logo_id: number | null }
+type Merk = { naam: string | null; subtitel: string | null; kleur: string | null; heeft_logo: boolean; logo_id: number | null; heeft_achtergrond: boolean; achtergrond_id: number | null }
 
 function Huisstijl({ onWijziging }: { onWijziging: () => void }) {
   const [naam, setNaam] = useState('')
@@ -90,6 +90,7 @@ function Huisstijl({ onWijziging }: { onWijziging: () => void }) {
   const [fout, setFout] = useState('')
   const [bezig, setBezig] = useState(false)
   const logoInput = useRef<HTMLInputElement>(null)
+  const achtergrondInput = useRef<HTMLInputElement>(null)
 
   const laad = async () => {
     const r = await fetch('/api/merk')
@@ -122,8 +123,21 @@ function Huisstijl({ onWijziging }: { onWijziging: () => void }) {
     const r = await fetch('/api/merk/logo', { method: 'DELETE' })
     if (r.ok) { setMerk((await r.json()).merk); onWijziging() }
   }
+  async function uploadAchtergrond(file: File) {
+    setBezig(true); setFout(''); setMelding('')
+    const fd = new FormData(); fd.append('achtergrond', file)
+    const r = await fetch('/api/merk/achtergrond', { method: 'POST', body: fd })
+    const d = await r.json()
+    if (!r.ok) { setFout(d.error || 'Upload mislukt') } else { setMerk(d.merk); setMelding('Achtergrond bijgewerkt.'); onWijziging() }
+    setBezig(false)
+  }
+  async function wisAchtergrond() {
+    const r = await fetch('/api/merk/achtergrond', { method: 'DELETE' })
+    if (r.ok) { setMerk((await r.json()).merk); onWijziging() }
+  }
 
   const logoUrl = merk?.heeft_logo && merk.logo_id != null ? `/api/merk/${merk.logo_id}/logo?t=${Date.now()}` : null
+  const achtergrondUrl = merk?.heeft_achtergrond && merk.achtergrond_id != null ? `/api/merk/${merk.achtergrond_id}/achtergrond?t=${Date.now()}` : null
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-4">
@@ -159,13 +173,33 @@ function Huisstijl({ onWijziging }: { onWijziging: () => void }) {
           </div>
         </div>
 
-        {/* Voorbeeld */}
-        <div className="rounded-xl overflow-hidden border border-gray-700" style={{ ['--brand' as string]: kleur } as React.CSSProperties}>
-          <div className="p-4 flex items-center gap-3" style={{ backgroundColor: kleur }}>
-            {logoUrl ? <img src={logoUrl} alt="" className="h-8 w-8 object-contain rounded bg-white/20 p-0.5" /> : <span className="text-2xl">📤</span>}
-            <div className="text-white font-bold">{naam || 'Jouw bedrijf'}</div>
+        <div className="flex items-center gap-4">
+          <div className="w-28 h-16 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
+            {achtergrondUrl ? <img src={achtergrondUrl} alt="achtergrond" className="w-full h-full object-cover" /> : <span className="text-xl">🖼️</span>}
           </div>
-          <div className="p-4 bg-gray-800 text-sm text-gray-300">Zo ziet de kop van je downloadpagina eruit voor ontvangers.</div>
+          <div className="text-sm">
+            <div className="text-xs text-gray-400 mb-1">Achtergrond downloadpagina (PNG/JPG/WEBP, max 6 MB)</div>
+            <div className="flex gap-2">
+              <input ref={achtergrondInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadAchtergrond(e.target.files[0]); e.target.value = '' }} />
+              <button onClick={() => achtergrondInput.current?.click()} disabled={bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 text-sm disabled:opacity-50">Achtergrond kiezen…</button>
+              {merk?.heeft_achtergrond && <button onClick={wisAchtergrond} className="text-gray-400 hover:text-red-300 underline text-sm">Verwijderen</button>}
+            </div>
+          </div>
+        </div>
+
+        {/* Voorbeeld — zoals de ontvanger de downloadpagina ziet */}
+        <div>
+          <div className="text-xs text-gray-400 mb-1">Voorbeeld downloadpagina</div>
+          <div className="rounded-xl overflow-hidden border border-gray-700 relative p-5" style={{ ['--brand' as string]: kleur } as React.CSSProperties}>
+            {achtergrondUrl && <><img src={achtergrondUrl} alt="" className="absolute inset-0 w-full h-full object-cover" /><div className="absolute inset-0 bg-black/55" /></>}
+            <div className="relative mx-auto max-w-[220px] rounded-xl overflow-hidden shadow-lg">
+              <div className="p-3 flex items-center gap-2" style={{ backgroundColor: kleur }}>
+                {logoUrl ? <img src={logoUrl} alt="" className="h-7 w-7 object-contain rounded bg-white/20 p-0.5" /> : <span className="text-xl">📤</span>}
+                <div className="text-white font-bold text-sm truncate">{naam || 'Jouw bedrijf'}</div>
+              </div>
+              <div className="p-3 bg-gray-900 text-xs text-gray-300">📦 voorbeeld.zip<div className="mt-2 rounded-md text-center text-white text-xs py-1.5" style={{ backgroundColor: kleur }}>⬇️ Downloaden</div></div>
+            </div>
+          </div>
         </div>
 
         {melding && <div className="text-sm text-green-400">{melding}</div>}
