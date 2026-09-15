@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { hashWachtwoord, maakToken, zetSessieCookie } from '@/lib/auth'
+import { haalMerk } from '@/lib/merk'
 
 export const runtime = 'nodejs'
 
@@ -21,7 +22,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
 
   const db = getDb()
   const aantal = (db.prepare('SELECT COUNT(*) n FROM deel_account WHERE gebruiker_id = ?').get(u.id) as { n: number }).n
-  return NextResponse.json({ gebruikersnaam: u.gebruikersnaam, weergavenaam: u.weergavenaam, aantal_bestanden: aantal })
+  // Wie heeft (het laatst) met deze persoon gedeeld? Toon diens huisstijl.
+  const deler = db.prepare(`
+    SELECT gedeeld_door FROM (
+      SELECT gedeeld_door, created_at FROM deel_account WHERE gebruiker_id = @u AND gedeeld_door IS NOT NULL
+      UNION ALL
+      SELECT gedeeld_door, created_at FROM deel_map WHERE ontvanger_type = 'account' AND ontvanger_id = @u AND gedeeld_door IS NOT NULL
+    ) ORDER BY created_at DESC LIMIT 1
+  `).get({ u: u.id }) as { gedeeld_door: number } | undefined
+  const merk = deler ? haalMerk(deler.gedeeld_door) : null
+  return NextResponse.json({ gebruikersnaam: u.gebruikersnaam, weergavenaam: u.weergavenaam, aantal_bestanden: aantal, merk })
 }
 
 // Uitnodiging accepteren: wachtwoord instellen, account activeren, inloggen.

@@ -22,12 +22,14 @@ const BESTAND_DIR = process.env.SHARE_BESTAND_DIR
 const UPLOAD_TMP_DIR = process.env.SHARE_UPLOAD_TMP_DIR
   ? path.resolve(process.env.SHARE_UPLOAD_TMP_DIR)
   : path.join(DB_DIR, 'uploads-tmp')
+// Huisstijl-logo's (klein) — bewust LOKAAL, altijd beschikbaar, buiten public/.
+const MERK_DIR = path.join(DB_DIR, 'merk')
 
 let _db: Database.Database | null = null
 
 export function getDb(): Database.Database {
   if (_db) return _db
-  for (const d of [DB_DIR, BESTAND_DIR, UPLOAD_TMP_DIR]) {
+  for (const d of [DB_DIR, BESTAND_DIR, UPLOAD_TMP_DIR, MERK_DIR]) {
     if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true })
   }
   _db = new Database(DB_PATH)
@@ -44,7 +46,7 @@ export function closeDb() {
   }
 }
 
-export { DB_PATH, BESTAND_DIR, UPLOAD_TMP_DIR }
+export { DB_PATH, BESTAND_DIR, UPLOAD_TMP_DIR, MERK_DIR }
 
 function migrate(db: Database.Database) {
   // ── Gebruikers ──────────────────────────────────────────────────────────────
@@ -64,6 +66,17 @@ function migrate(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `)
+
+  // Huisstijl per gebruiker (branding/skin): bedrijfsnaam, tagline, accentkleur, logo.
+  // Toegepast in de eigen app-weergave én op de publieke deel-/uitnodigingspagina's.
+  {
+    const cols = db.prepare('PRAGMA table_info(gebruiker)').all() as { name: string }[]
+    const heeft = (n: string) => cols.some(c => c.name === n)
+    if (!heeft('merk_naam')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_naam TEXT')
+    if (!heeft('merk_subtitel')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_subtitel TEXT')
+    if (!heeft('merk_kleur')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_kleur TEXT')
+    if (!heeft('merk_logo')) db.exec('ALTER TABLE gebruiker ADD COLUMN merk_logo TEXT')
+  }
 
   // ── Bestanden ────────────────────────────────────────────────────────────────
   // Fysiek op schijf in data/bestanden/<eigenaar_id>/<opgeslagen_naam>.

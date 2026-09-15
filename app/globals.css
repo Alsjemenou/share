@@ -199,6 +199,20 @@ html.light .fixed textarea {
   color: #0f172a !important;
 }
 
+/* ── Huisstijl (per gebruiker) ────────────────────────────────────────────────
+   Binnen een .merk-element (met inline --brand) vervangt de accentkleur het oranje.
+   color-mix geeft de hover-varianten iets lichter/donkerder voor feedback. */
+.merk .bg-amber-600,
+.merk .bg-amber-500 { background-color: var(--brand); }
+.merk .hover\:bg-amber-500:hover { background-color: color-mix(in srgb, var(--brand), white 15%); }
+.merk .hover\:bg-amber-600:hover { background-color: color-mix(in srgb, var(--brand), black 10%); }
+.merk .text-amber-400,
+.merk .text-amber-300 { color: var(--brand); }
+.merk .hover\:text-amber-400:hover { color: var(--brand); }
+.merk .border-amber-500\/40 { border-color: color-mix(in srgb, var(--brand) 45%, transparent); }
+.merk .bg-amber-500\/10,
+.merk .bg-amber-500\/15 { background-color: color-mix(in srgb, var(--brand) 12%, transparent); }
+
 /* Tekst op gekleurde knoppen blijft altijd wit */
 html.light main .bg-amber-600.text-white,
 html.light main .bg-amber-600 .text-white,

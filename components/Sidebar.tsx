@@ -14,8 +14,12 @@ const ADMIN_ITEM = { href: '/beheer', label: 'Beheer', icon: '🛡️' }
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { gebruiker } = useGebruiker()
+  const { gebruiker, merk } = useGebruiker()
   const [open, setOpen] = useState(false)
+
+  const merkNaam = merk?.naam || 'Deel'
+  const merkSub = merk?.subtitel || 'Bestanden delen'
+  const logo = merk?.heeft_logo && merk.logo_id != null ? `/api/merk/${merk.logo_id}/logo` : null
 
   useEffect(() => { setOpen(false) }, [pathname])
 
@@ -42,7 +46,10 @@ export default function Sidebar() {
             <rect y="12" width="18" height="2" rx="1" fill="currentColor" />
           </svg>
         </button>
-        <span className="text-amber-400 font-bold text-sm">📤 Deel</span>
+        <span className="flex items-center gap-1.5 text-amber-400 font-bold text-sm min-w-0">
+          {logo ? <img src={logo} alt="" className="h-5 w-5 object-contain rounded" /> : <span>📤</span>}
+          <span className="truncate">{merkNaam}</span>
+        </span>
         {activeItem && (
           <span className="ml-auto text-xs text-gray-400 mr-1">{activeItem.icon} {activeItem.label}</span>
         )}
@@ -64,9 +71,12 @@ export default function Sidebar() {
         ].join(' ')}
       >
         <div className="px-5 py-5 border-b border-gray-800 flex items-center justify-between">
-          <div>
-            <div className="text-lg font-bold text-amber-400">📤 Deel</div>
-            <div className="text-xs text-gray-500 mt-0.5">Bestanden delen</div>
+          <div className="min-w-0 flex items-center gap-2">
+            {logo ? <img src={logo} alt="" className="h-8 w-8 object-contain rounded shrink-0" /> : <span className="text-lg">📤</span>}
+            <div className="min-w-0">
+              <div className="text-lg font-bold text-amber-400 truncate leading-tight">{merkNaam}</div>
+              <div className="text-xs text-gray-500 mt-0.5 truncate">{merkSub}</div>
+            </div>
           </div>
           <button
             onClick={() => setOpen(false)}

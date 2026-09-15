@@ -1,7 +1,8 @@
 'use client'
 import { use, useEffect, useState } from 'react'
 
-type Info = { gebruikersnaam: string; weergavenaam: string; aantal_bestanden: number }
+type Merk = { naam: string | null; subtitel: string | null; kleur: string | null; heeft_logo: boolean; logo_id: number | null }
+type Info = { gebruikersnaam: string; weergavenaam: string; aantal_bestanden: number; merk: Merk | null }
 
 export default function UitnodigingPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
@@ -35,13 +36,24 @@ export default function UitnodigingPage({ params }: { params: Promise<{ token: s
     } finally { setBezig(false) }
   }
 
+  const merk = info?.merk || null
+  const heeftMerk = !!(merk && (merk.naam || merk.heeft_logo || merk.kleur))
+  const logoUrl = merk?.heeft_logo && merk.logo_id != null ? `/api/merk/${merk.logo_id}/logo` : null
+
   const Kaart = ({ children }: { children: React.ReactNode }) => (
-    <div className="w-full max-w-sm">
-      <div className="text-center mb-5">
-        <div className="text-4xl mb-2">📤</div>
-        <h1 className="text-xl font-bold text-amber-400">Deel</h1>
-      </div>
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">{children}</div>
+    <div className={`w-full max-w-sm ${merk?.kleur ? 'merk' : ''}`} style={merk?.kleur ? ({ ['--brand']: merk.kleur } as React.CSSProperties) : undefined}>
+      {heeftMerk ? (
+        <div className="rounded-t-2xl px-5 py-4 flex items-center gap-3" style={{ backgroundColor: merk?.kleur || '#111827' }}>
+          {logoUrl ? <img src={logoUrl} alt="" className="h-9 w-9 object-contain rounded bg-white/20 p-0.5" /> : <span className="text-2xl">📤</span>}
+          <div className="min-w-0">
+            <div className="text-white font-bold truncate leading-tight">{merk?.naam || 'Deel'}</div>
+            {merk?.subtitel && <div className="text-white/80 text-xs truncate">{merk.subtitel}</div>}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center mb-5"><div className="text-4xl mb-2">📤</div><h1 className="text-xl font-bold text-amber-400">Deel</h1></div>
+      )}
+      <div className={`bg-gray-900 border border-gray-800 p-6 ${heeftMerk ? 'rounded-b-2xl border-t-0' : 'rounded-2xl'}`}>{children}</div>
     </div>
   )
 

@@ -11,8 +11,17 @@ export type Gebruiker = {
   status: string
 }
 
-const GebruikerCtx = createContext<{ gebruiker: Gebruiker | null; herlaad: () => void }>({
+export type Merk = {
+  naam: string | null
+  subtitel: string | null
+  kleur: string | null
+  heeft_logo: boolean
+  logo_id: number | null
+}
+
+const GebruikerCtx = createContext<{ gebruiker: Gebruiker | null; merk: Merk | null; herlaad: () => void }>({
   gebruiker: null,
+  merk: null,
   herlaad: () => {},
 })
 export const useGebruiker = () => useContext(GebruikerCtx)
@@ -20,6 +29,7 @@ export const useGebruiker = () => useContext(GebruikerCtx)
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [laden, setLaden] = useState(true)
   const [gebruiker, setGebruiker] = useState<Gebruiker | null>(null)
+  const [merk, setMerk] = useState<Merk | null>(null)
   const [setup, setSetup] = useState(false)
 
   const herlaad = useCallback(async () => {
@@ -27,6 +37,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       const r = await fetch('/api/auth/me')
       const d = await r.json()
       setGebruiker(d.gebruiker)
+      setMerk(d.merk || null)
       setSetup(!!d.setup)
     } finally {
       setLaden(false)
@@ -43,9 +54,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return <AuthScherm setup={setup} onKlaar={herlaad} />
   }
 
+  const merkStyle = merk?.kleur ? ({ ['--brand']: merk.kleur } as React.CSSProperties) : undefined
+
   return (
-    <GebruikerCtx.Provider value={{ gebruiker, herlaad }}>
-      <div className="flex h-screen w-full">
+    <GebruikerCtx.Provider value={{ gebruiker, merk, herlaad }}>
+      <div className={`flex h-screen w-full ${merk?.kleur ? 'merk' : ''}`} style={merkStyle}>
         <Sidebar />
         <main className="flex-1 overflow-auto px-4 pb-6 pt-16 md:p-8 min-w-0">
           {children}
