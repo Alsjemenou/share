@@ -16,6 +16,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!g.mag_branding) return NextResponse.json({ error: 'Je hebt geen recht op een eigen huisstijl' }, { status: 403 })
   const { naam, subtitel, kleur } = await req.json()
   const db = getDb()
 

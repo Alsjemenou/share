@@ -13,6 +13,7 @@ const MAX = 2 * 1024 * 1024 // 2 MB
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!g.mag_branding) return NextResponse.json({ error: 'Je hebt geen recht op een eigen huisstijl' }, { status: 403 })
 
   const form = await req.formData()
   const file = form.get('logo') as File | null

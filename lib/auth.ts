@@ -16,6 +16,7 @@ export type Gebruiker = {
   email: string | null
   is_admin: number
   status: string
+  mag_branding: number
 }
 
 // ── Sessiegeheim (voor cookie-ondertekening) ────────────────────────────────
@@ -96,7 +97,7 @@ export async function huidigeGebruiker(): Promise<Gebruiker | null> {
   if (!uid) return null
   const db = getDb()
   const g = db.prepare(
-    "SELECT id, gebruikersnaam, weergavenaam, email, is_admin, status FROM gebruiker WHERE id = ? AND status = 'actief'"
+    "SELECT id, gebruikersnaam, weergavenaam, email, is_admin, status, mag_branding FROM gebruiker WHERE id = ? AND status = 'actief'"
   ).get(uid) as Gebruiker | undefined
   return g ?? null
 }

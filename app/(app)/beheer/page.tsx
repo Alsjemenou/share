@@ -75,7 +75,7 @@ function AlleBestanden() {
 }
 
 // ── Personen ──────────────────────────────────────────────────────────────────
-type Persoon = { id: number; gebruikersnaam: string; weergavenaam: string; email: string | null; is_admin: number; status: string; aantal_bestanden: number }
+type Persoon = { id: number; gebruikersnaam: string; weergavenaam: string; email: string | null; is_admin: number; mag_branding: number; status: string; aantal_bestanden: number }
 function Personen() {
   const { gebruiker } = useGebruiker()
   const [personen, setPersonen] = useState<Persoon[]>([])
@@ -104,6 +104,10 @@ function Personen() {
   }
   async function toggleAdmin(p: Persoon) {
     await fetch('/api/gebruikers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, is_admin: p.is_admin ? 0 : 1 }) })
+    laad()
+  }
+  async function toggleBranding(p: Persoon) {
+    await fetch('/api/gebruikers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, mag_branding: p.mag_branding ? 0 : 1 }) })
     laad()
   }
   async function wis(p: Persoon) {
@@ -136,12 +140,14 @@ function Personen() {
               <div className="text-sm font-medium truncate">
                 {p.weergavenaam} <span className="text-gray-500 font-normal">@{p.gebruikersnaam}</span>
                 {p.is_admin ? <span className="ml-2 text-[11px] bg-amber-500/20 text-amber-300 rounded px-1.5 py-0.5">beheerder</span> : null}
+                {p.mag_branding ? <span className="ml-2 text-[11px] bg-purple-500/20 text-purple-300 rounded px-1.5 py-0.5">huisstijl</span> : null}
                 {p.status === 'uitgenodigd' ? <span className="ml-2 text-[11px] bg-gray-700 text-gray-300 rounded px-1.5 py-0.5">uitgenodigd</span> : null}
               </div>
               <div className="text-xs text-gray-500">{p.email || '—'} · {p.aantal_bestanden} bestand{p.aantal_bestanden === 1 ? '' : 'en'}</div>
             </div>
             <div className="flex items-center gap-2 text-xs shrink-0">
               <button onClick={() => reset(p)} className="text-gray-400 hover:text-white underline">Wachtwoord</button>
+              <button onClick={() => toggleBranding(p)} className="text-gray-400 hover:text-white underline">{p.mag_branding ? 'Huisstijl uit' : 'Huisstijl aan'}</button>
               <button onClick={() => toggleAdmin(p)} className="text-gray-400 hover:text-white underline">{p.is_admin ? 'Geen beheer' : 'Beheer'}</button>
               {p.id !== gebruiker?.id && <button onClick={() => wis(p)} className="text-gray-400 hover:text-red-300 underline">Verwijder</button>}
             </div>

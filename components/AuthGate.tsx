@@ -9,6 +9,7 @@ export type Gebruiker = {
   email: string | null
   is_admin: number
   status: string
+  mag_branding: number
 }
 
 export type Merk = {

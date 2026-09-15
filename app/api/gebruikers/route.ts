@@ -12,7 +12,7 @@ export async function GET() {
   if (fout) return fout
   const db = getDb()
   const gebruikers = db.prepare(`
-    SELECT g.id, g.gebruikersnaam, g.weergavenaam, g.email, g.is_admin, g.status, g.created_at,
+    SELECT g.id, g.gebruikersnaam, g.weergavenaam, g.email, g.is_admin, g.status, g.mag_branding, g.created_at,
            (SELECT COUNT(*) FROM bestand b WHERE b.eigenaar_id = g.id) AS aantal_bestanden
     FROM gebruiker g ORDER BY g.status, g.gebruikersnaam
   `).all()
@@ -48,13 +48,16 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const { fout } = await vereisAdmin()
   if (fout) return fout
-  const { id, weergavenaam, is_admin, nieuw_wachtwoord } = await req.json()
+  const { id, weergavenaam, is_admin, mag_branding, nieuw_wachtwoord } = await req.json()
   const db = getDb()
   if (weergavenaam !== undefined) {
     db.prepare('UPDATE gebruiker SET weergavenaam = ? WHERE id = ?').run(String(weergavenaam).trim(), id)
   }
   if (is_admin !== undefined) {
     db.prepare('UPDATE gebruiker SET is_admin = ? WHERE id = ?').run(is_admin ? 1 : 0, id)
+  }
+  if (mag_branding !== undefined) {
+    db.prepare('UPDATE gebruiker SET mag_branding = ? WHERE id = ?').run(mag_branding ? 1 : 0, id)
   }
   if (nieuw_wachtwoord) {
     if (String(nieuw_wachtwoord).length < 6) {

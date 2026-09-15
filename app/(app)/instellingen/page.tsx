@@ -73,7 +73,7 @@ export default function InstellingenPage() {
         </div>
       </div>
 
-      <Huisstijl onWijziging={herlaad} />
+      {gebruiker?.mag_branding ? <Huisstijl onWijziging={herlaad} /> : null}
     </div>
   )
 }

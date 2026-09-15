@@ -16,13 +16,18 @@ export function geldigeKleur(k: unknown): string | null {
   return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : null
 }
 
-type Rij = { merk_naam: string | null; merk_subtitel: string | null; merk_kleur: string | null; merk_logo: string | null }
+type Rij = { merk_naam: string | null; merk_subtitel: string | null; merk_kleur: string | null; merk_logo: string | null; mag_branding: number }
 
-// Huisstijl van een gebruiker. Geeft altijd een object terug (alles null = geen stijl).
+const LEEG: Merk = { naam: null, subtitel: null, kleur: null, heeft_logo: false, logo_id: null }
+
+// Huisstijl van een gebruiker. Alleen toegepast als de gebruiker het recht
+// 'mag_branding' heeft (door de beheerder toegekend) — anders een leeg merk,
+// zodat het intrekken van het recht de branding overal laat verdwijnen.
 export function haalMerk(gebruikerId: number): Merk {
   const db = getDb()
-  const r = db.prepare('SELECT merk_naam, merk_subtitel, merk_kleur, merk_logo FROM gebruiker WHERE id = ?')
+  const r = db.prepare('SELECT merk_naam, merk_subtitel, merk_kleur, merk_logo, mag_branding FROM gebruiker WHERE id = ?')
     .get(gebruikerId) as Rij | undefined
+  if (!r || !r.mag_branding) return LEEG
   return {
     naam: r?.merk_naam || null,
     subtitel: r?.merk_subtitel || null,
