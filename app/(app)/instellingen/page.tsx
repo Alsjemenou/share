@@ -192,7 +192,7 @@ function Huisstijl({ onWijziging }: { onWijziging: () => void }) {
           <div className="text-xs text-gray-400 mb-1">Voorbeeld downloadpagina</div>
           <div className="rounded-xl overflow-hidden border border-gray-700 relative p-5" style={{ ['--brand' as string]: kleur } as React.CSSProperties}>
             {achtergrondUrl && <><img src={achtergrondUrl} alt="" className="absolute inset-0 w-full h-full object-cover" /><div className="absolute inset-0 bg-black/55" /></>}
-            <div className="relative mx-auto max-w-[220px] rounded-xl overflow-hidden shadow-lg">
+            <div className={`relative max-w-[220px] rounded-xl overflow-hidden shadow-lg ${achtergrondUrl ? 'mr-auto' : 'mx-auto'}`}>
               <div className="p-3 flex items-center gap-2" style={{ backgroundColor: kleur }}>
                 {logoUrl ? <img src={logoUrl} alt="" className="h-7 w-7 object-contain rounded bg-white/20 p-0.5" /> : <span className="text-xl">📤</span>}
                 <div className="text-white font-bold text-sm truncate">{naam || 'Jouw bedrijf'}</div>

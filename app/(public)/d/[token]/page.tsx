@@ -42,7 +42,7 @@ export default function DownloadPage({ params }: { params: Promise<{ token: stri
   const achtergrondUrl = merk?.heeft_achtergrond && merk.achtergrond_id != null ? `/api/merk/${merk.achtergrond_id}/achtergrond` : null
 
   const Kaart = ({ children }: { children: React.ReactNode }) => (
-    <div className={`relative z-10 w-full max-w-sm ${merk?.kleur ? 'merk' : ''} ${achtergrondUrl ? 'shadow-2xl' : ''}`} style={merk?.kleur ? ({ ['--brand']: merk.kleur } as React.CSSProperties) : undefined}>
+    <div className={`relative z-10 w-full max-w-sm ${merk?.kleur ? 'merk' : ''} ${achtergrondUrl ? 'shadow-2xl self-start mr-auto' : ''}`} style={merk?.kleur ? ({ ['--brand']: merk.kleur } as React.CSSProperties) : undefined}>
       {heeftMerk ? (
         <div className="rounded-t-2xl px-5 py-4 flex items-center gap-3" style={{ backgroundColor: merk?.kleur || '#111827' }}>
           {logoUrl ? <img src={logoUrl} alt="" className="h-9 w-9 object-contain rounded bg-white/20 p-0.5" /> : <span className="text-2xl">📤</span>}
