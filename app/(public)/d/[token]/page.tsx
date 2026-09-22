@@ -3,7 +3,7 @@ import { use, useEffect, useState } from 'react'
 import { formatBytes, bestandIcoon } from '@/lib/format'
 
 type Merk = { naam: string | null; subtitel: string | null; kleur: string | null; heeft_logo: boolean; logo_id: number | null; heeft_achtergrond: boolean; achtergrond_id: number | null }
-type Meta = { naam: string; grootte: number; mime: string; heeft_wachtwoord: boolean; reden: string | null; grant: string | null; merk: Merk | null }
+type Meta = { naam: string; grootte: number; mime: string; heeft_wachtwoord: boolean; reden: string | null; grant: string | null; modus: string; merk: Merk | null }
 
 export default function DownloadPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
@@ -62,29 +62,48 @@ export default function DownloadPage({ params }: { params: Promise<{ token: stri
   if (laden) inner = <Kaart><div className="text-center text-gray-500 text-sm py-4">Laden…</div></Kaart>
   else if (fout && !meta) inner = <Kaart><div className="text-center"><div className="text-3xl mb-2">🚫</div><div className="text-sm text-gray-300">{fout}</div></div></Kaart>
   else if (meta?.reden) inner = <Kaart><div className="text-center"><div className="text-3xl mb-2">⏳</div><div className="text-sm text-gray-300">{meta.reden}</div></div></Kaart>
-  else inner = (
-    <Kaart>
-      <div className="flex items-center gap-3 mb-5">
-        <span className="text-4xl">{meta ? bestandIcoon(meta.mime, meta.naam) : '📦'}</span>
-        <div className="min-w-0">
-          <div className="font-medium truncate">{meta?.naam}</div>
-          <div className="text-xs text-gray-500">{meta ? formatBytes(meta.grootte) : ''}</div>
-        </div>
-      </div>
+  else {
+    const preview = meta?.modus === 'preview'
+    const isAudio = !!meta && meta.mime.startsWith('audio/')
+    const isVideo = !!meta && meta.mime.startsWith('video/')
+    const streamUrl = grant ? `/api/download/${token}/bestand?dl=${encodeURIComponent(grant)}` : ''
+    const geenAfspelen = (e: React.SyntheticEvent) => e.preventDefault()
 
-      {grant ? (
-        <a href={`/api/download/${token}/bestand?dl=${encodeURIComponent(grant)}`} className="block text-center bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-3 text-sm">⬇️ Downloaden</a>
-      ) : (
-        <form onSubmit={ontgrendel} className="space-y-3">
-          <p className="text-sm text-gray-400">Dit bestand is beveiligd met een wachtwoord.</p>
-          <input type="password" value={wachtwoord} onChange={e => setWachtwoord(e.target.value)} placeholder="Wachtwoord" autoFocus className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
-          {fout && <div className="text-sm text-red-400">{fout}</div>}
-          <button type="submit" disabled={bezig} className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm">{bezig ? 'Controleren…' : 'Ontgrendelen'}</button>
-        </form>
-      )}
-      {heeftMerk && <div className="mt-4 text-center text-[11px] text-gray-600">Gedeeld via Deel</div>}
-    </Kaart>
-  )
+    inner = (
+      <Kaart>
+        <div className="flex items-center gap-3 mb-5">
+          <span className="text-4xl">{preview ? '🎧' : meta ? bestandIcoon(meta.mime, meta.naam) : '📦'}</span>
+          <div className="min-w-0">
+            <div className="font-medium truncate">{meta?.naam}</div>
+            <div className="text-xs text-gray-500">{preview ? 'Alleen beluisteren' : (meta ? formatBytes(meta.grootte) : '')}</div>
+          </div>
+        </div>
+
+        {!grant ? (
+          <form onSubmit={ontgrendel} className="space-y-3">
+            <p className="text-sm text-gray-400">Dit {preview ? 'fragment' : 'bestand'} is beveiligd met een wachtwoord.</p>
+            <input type="password" value={wachtwoord} onChange={e => setWachtwoord(e.target.value)} placeholder="Wachtwoord" autoFocus className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+            {fout && <div className="text-sm text-red-400">{fout}</div>}
+            <button type="submit" disabled={bezig} className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm">{bezig ? 'Controleren…' : 'Ontgrendelen'}</button>
+          </form>
+        ) : preview ? (
+          <div onContextMenu={geenAfspelen}>
+            {isAudio ? (
+              <audio src={streamUrl} controls controlsList="nodownload noplaybackrate" onContextMenu={geenAfspelen} className="w-full" />
+            ) : isVideo ? (
+              <video src={streamUrl} controls controlsList="nodownload noplaybackrate nofullscreen" disablePictureInPicture onContextMenu={geenAfspelen} className="w-full rounded-lg" />
+            ) : (
+              <div className="text-sm text-gray-400 text-center py-2">Dit bestandstype kan niet in de browser worden afgespeeld.</div>
+            )}
+            <div className="mt-3 text-[11px] text-gray-500 text-center">Alleen om te beluisteren — downloaden is uitgeschakeld.</div>
+          </div>
+        ) : (
+          <a href={streamUrl} className="block text-center bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-3 text-sm">⬇️ Downloaden</a>
+        )}
+        {heeftMerk && <div className="mt-4 text-center text-[11px] text-gray-600">Gedeeld via Deel</div>}
+      </Kaart>
+    )
+  }
 
   return (
     <>

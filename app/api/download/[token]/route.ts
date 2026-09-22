@@ -37,8 +37,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     mime: link.mime,
     heeft_wachtwoord: heeftWachtwoord,
     reden,
+    modus: link.modus,
     merk: haalMerk(link.eigenaar_id),
-    // Zonder wachtwoord en geldig: direct een download-grant meegeven.
+    // Zonder wachtwoord en geldig: direct een grant meegeven (voor download of stream).
     grant: !reden && !heeftWachtwoord ? maakGrant(link.id) : null,
   })
 }

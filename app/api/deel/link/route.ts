@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const db = getDb()
   const links = db.prepare(`
-    SELECT id, token, verloopt_op, max_downloads, download_count, actief, created_at,
+    SELECT id, token, verloopt_op, max_downloads, download_count, actief, created_at, modus,
            (wachtwoord_hash IS NOT NULL) AS heeft_wachtwoord
     FROM deel_link WHERE bestand_id = ? ORDER BY created_at DESC
   `).all(bestandId)
@@ -32,23 +32,26 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { bestand_id, wachtwoord, verloop_dagen, max_downloads } = await req.json()
+  const { bestand_id, wachtwoord, verloop_dagen, max_downloads, modus } = await req.json()
   if (!magBeheren(g, Number(bestand_id))) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
+
+  const linkModus = modus === 'preview' ? 'preview' : 'download'
 
   let verlooptOp: string | null = null
   const dagen = Number(verloop_dagen)
   if (Number.isFinite(dagen) && dagen > 0) {
     verlooptOp = new Date(Date.now() + dagen * 86400_000).toISOString()
   }
+  // Downloadlimiet is niet van toepassing op preview-links.
   let maxDl: number | null = null
   const md = Number(max_downloads)
-  if (Number.isFinite(md) && md > 0) maxDl = Math.floor(md)
+  if (linkModus === 'download' && Number.isFinite(md) && md > 0) maxDl = Math.floor(md)
 
   const token = maakDeelToken()
   const db = getDb()
   db.prepare(`
-    INSERT INTO deel_link (bestand_id, token, wachtwoord_hash, verloopt_op, max_downloads, aangemaakt_door)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO deel_link (bestand_id, token, wachtwoord_hash, verloopt_op, max_downloads, aangemaakt_door, modus)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     Number(bestand_id),
     token,
@@ -56,6 +59,7 @@ export async function POST(req: NextRequest) {
     verlooptOp,
     maxDl,
     g.id,
+    linkModus,
   )
   return NextResponse.json({ token })
 }

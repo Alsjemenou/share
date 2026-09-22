@@ -40,13 +40,15 @@ export type DeelLink = {
   max_downloads: number | null
   download_count: number
   actief: number
+  modus: string
 }
 
 // Waarom een publieke link niet (meer) geldig is — of null als hij goed is.
 export function linkOngeldigReden(link: DeelLink): string | null {
   if (!link.actief) return 'Deze link is uitgeschakeld.'
   if (link.verloopt_op && Date.now() > Date.parse(link.verloopt_op)) return 'Deze link is verlopen.'
-  if (link.max_downloads != null && link.download_count >= link.max_downloads) {
+  // Een downloadlimiet geldt niet voor preview-links (alleen beluisteren).
+  if (link.modus !== 'preview' && link.max_downloads != null && link.download_count >= link.max_downloads) {
     return 'Het maximum aantal downloads voor deze link is bereikt.'
   }
   return null

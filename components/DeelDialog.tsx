@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { formatDatum, formatDatumKort } from '@/lib/format'
 
-export type DeelDoel = { soort: 'bestand' | 'map'; id: number; naam: string }
+export type DeelDoel = { soort: 'bestand' | 'map'; id: number; naam: string; mime?: string }
 type Props = { doel: DeelDoel; onClose: () => void; onWijziging?: () => void; initieelTab?: 'delen' | 'link' | 'downloads' }
 
 type Link = {
   id: number; token: string; verloopt_op: string | null; max_downloads: number | null
-  download_count: number; actief: number; created_at: string; heeft_wachtwoord: number
+  download_count: number; actief: number; created_at: string; heeft_wachtwoord: number; modus: string
 }
 type Account = { id: number; weergavenaam: string; email: string | null; status: string; invite_token: string | null }
 type Groep = { id: number; naam: string; aantal_leden: number }
@@ -56,7 +56,7 @@ export default function DeelDialog({ doel, onClose, onWijziging, initieelTab }: 
 
         <div className="p-5">
           {tab === 'delen' && <DelenTab doel={doel} origin={origin} onWijziging={onWijziging} />}
-          {tab === 'link' && isBestand && <LinkTab bestandId={doel.id} origin={origin} onWijziging={onWijziging} />}
+          {tab === 'link' && isBestand && <LinkTab bestandId={doel.id} mime={doel.mime} origin={origin} onWijziging={onWijziging} />}
           {tab === 'downloads' && isBestand && <DownloadsTab bestandId={doel.id} />}
         </div>
       </div>
@@ -200,13 +200,16 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
 }
 
 // ── Publieke link (alleen bestand) ────────────────────────────────────────────
-function LinkTab({ bestandId, origin, onWijziging }: { bestandId: number; origin: string; onWijziging?: () => void }) {
+function LinkTab({ bestandId, mime, origin, onWijziging }: { bestandId: number; mime?: string; origin: string; onWijziging?: () => void }) {
   const [links, setLinks] = useState<Link[]>([])
   const [wachtwoord, setWachtwoord] = useState('')
   const [verloop, setVerloop] = useState('0')
   const [maxDl, setMaxDl] = useState('')
+  const [preview, setPreview] = useState(false)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState('')
+
+  const speelbaar = !!mime && (mime.startsWith('audio/') || mime.startsWith('video/'))
 
   const laad = useCallback(async () => {
     const r = await fetch(`/api/deel/link?bestand=${bestandId}`)
@@ -217,10 +220,10 @@ function LinkTab({ bestandId, origin, onWijziging }: { bestandId: number; origin
   async function maak() {
     setBezig(true); setFout('')
     try {
-      const r = await fetch('/api/deel/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bestand_id: bestandId, wachtwoord: wachtwoord || undefined, verloop_dagen: Number(verloop) || undefined, max_downloads: maxDl || undefined }) })
+      const r = await fetch('/api/deel/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bestand_id: bestandId, wachtwoord: wachtwoord || undefined, verloop_dagen: Number(verloop) || undefined, max_downloads: preview ? undefined : (maxDl || undefined), modus: preview ? 'preview' : 'download' }) })
       const d = await r.json()
       if (!r.ok) { setFout(d.error || 'Kon link niet maken'); return }
-      setWachtwoord(''); setVerloop('0'); setMaxDl(''); await laad(); onWijziging?.()
+      setWachtwoord(''); setVerloop('0'); setMaxDl(''); setPreview(false); await laad(); onWijziging?.()
     } finally { setBezig(false) }
   }
   async function toggle(l: Link) { await fetch('/api/deel/link', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, actief: l.actief ? 0 : 1 }) }); await laad(); onWijziging?.() }
@@ -243,7 +246,7 @@ function LinkTab({ bestandId, origin, onWijziging }: { bestandId: number; origin
                   <KopieerKnop tekst={url} />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-400">
-                  <span>⬇️ {l.download_count}{l.max_downloads != null ? ` / ${l.max_downloads}` : ''}</span>
+                  {l.modus === 'preview' ? <span className="text-amber-400">🎧 alleen beluisteren</span> : <span>⬇️ {l.download_count}{l.max_downloads != null ? ` / ${l.max_downloads}` : ''}</span>}
                   {l.heeft_wachtwoord ? <span>🔒 wachtwoord</span> : null}
                   {l.verloopt_op ? <span>⏳ tot {formatDatumKort(l.verloopt_op)}</span> : <span>♾️ geen verloop</span>}
                   {!l.actief && <span className="text-red-400">uitgeschakeld</span>}
@@ -267,6 +270,15 @@ function LinkTab({ bestandId, origin, onWijziging }: { bestandId: number; origin
       {toonNieuw && (
         <div className="border border-gray-800 rounded-xl p-3 space-y-3">
           <div className="text-xs text-gray-400">Nieuwe deel-link</div>
+          {speelbaar && (
+            <label className={`flex items-start gap-2 text-sm rounded-lg p-2.5 cursor-pointer ${preview ? 'bg-amber-500/10 border border-amber-500/40' : 'bg-gray-800'}`}>
+              <input type="checkbox" checked={preview} onChange={e => setPreview(e.target.checked)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">🎧 Alleen beluisteren (geen download)</span>
+                <span className="block text-xs text-gray-500 mt-0.5">De ontvanger kan afspelen in de browser, maar krijgt geen downloadknop. Let op: bij streamen is downloaden nooit 100% te blokkeren.</span>
+              </span>
+            </label>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm"><span className="block text-xs text-gray-400 mb-1">Wachtwoord (optioneel)</span>
               <input value={wachtwoord} onChange={e => setWachtwoord(e.target.value)} placeholder="geen" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
@@ -274,8 +286,10 @@ function LinkTab({ bestandId, origin, onWijziging }: { bestandId: number; origin
               <select value={verloop} onChange={e => setVerloop(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="0">Nooit</option><option value="1">1 dag</option><option value="7">7 dagen</option><option value="30">30 dagen</option><option value="90">90 dagen</option>
               </select></label>
-            <label className="text-sm col-span-2"><span className="block text-xs text-gray-400 mb-1">Max. aantal downloads (optioneel)</span>
-              <input value={maxDl} onChange={e => setMaxDl(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="onbeperkt" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
+            {!preview && (
+              <label className="text-sm col-span-2"><span className="block text-xs text-gray-400 mb-1">Max. aantal downloads (optioneel)</span>
+                <input value={maxDl} onChange={e => setMaxDl(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="onbeperkt" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></label>
+            )}
           </div>
           {fout && <div className="text-sm text-red-400">{fout}</div>}
           <div className="flex gap-2">

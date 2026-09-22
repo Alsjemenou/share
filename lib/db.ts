@@ -112,6 +112,13 @@ function migrate(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_deellink_bestand ON deel_link(bestand_id);
   `)
+  // modus: 'download' (standaard) of 'preview' (alleen beluisteren, geen download).
+  {
+    const cols = db.prepare('PRAGMA table_info(deel_link)').all() as { name: string }[]
+    if (!cols.some(c => c.name === 'modus')) {
+      db.exec("ALTER TABLE deel_link ADD COLUMN modus TEXT NOT NULL DEFAULT 'download'")
+    }
+  }
 
   // ── Delen naar een specifiek account ──────────────────────────────────────────
   db.exec(`

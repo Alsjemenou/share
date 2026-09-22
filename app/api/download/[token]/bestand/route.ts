@@ -31,14 +31,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
 
   const veilig = path.basename(link.opgeslagen_naam)
   const absPad = path.join(BESTAND_DIR, String(link.eigenaar_id), veilig)
+  const preview = link.modus === 'preview'
 
-  // Alleen bij de eerste (niet-Range) aanvraag: teller ophogen + loggen.
-  if (!req.headers.get('range')) {
+  // Downloads tellen/loggen we alleen bij een echte download (niet bij preview-streaming),
+  // en alleen op de eerste (niet-Range) aanvraag.
+  if (!preview && !req.headers.get('range')) {
     db.prepare('UPDATE deel_link SET download_count = download_count + 1 WHERE id = ?').run(link.id)
     db.prepare('INSERT INTO download_log (bestand_id, deel_link_id, ip) VALUES (?, ?, ?)').run(
       link.bestand_id, link.id, req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for') || null,
     )
   }
 
-  return serveerBestand(req, absPad, { mime: link.mime, naam: link.originele_naam, alsBijlage: true })
+  // Preview → inline streamen (in de speler); download → als bijlage.
+  return serveerBestand(req, absPad, { mime: link.mime, naam: link.originele_naam, alsBijlage: !preview })
 }
