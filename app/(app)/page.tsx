@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Uploader from '@/components/Uploader'
 import DeelDialog, { type DeelDoel } from '@/components/DeelDialog'
+import VerplaatsDialog from '@/components/VerplaatsDialog'
 import { formatBytes, formatDatumKort, bestandIcoon } from '@/lib/format'
 
 type Map = { id: number; naam: string; aantal_submappen: number; aantal_bestanden: number }
@@ -19,9 +20,11 @@ export default function MijnBestandenPage() {
   const [laden, setLaden] = useState(true)
   const [deel, setDeel] = useState<(DeelDoel & { tab?: 'delen' | 'link' }) | null>(null)
   const [verplaats, setVerplaats] = useState<Bestand | null>(null)
+  const [selectie, setSelectie] = useState<Set<number>>(new Set())
 
   const laad = useCallback(async (mapId: number | null) => {
     setLaden(true)
+    setSelectie(new Set())
     const r = await fetch(`/api/mappen${mapId != null ? `?map=${mapId}` : ''}`)
     if (r.ok) {
       const d = await r.json()
@@ -53,6 +56,17 @@ export default function MijnBestandenPage() {
     laad(huidigeMap)
   }
 
+  function toggleSel(id: number) {
+    setSelectie(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function allesSel() {
+    setSelectie(prev => prev.size === bestanden.length ? new Set() : new Set(bestanden.map(b => b.id)))
+  }
+  function downloadSelectie() {
+    if (selectie.size === 0) return
+    window.location.href = `/api/download-zip?ids=${[...selectie].join(',')}`
+  }
+
   const totaal = bestanden.reduce((s, b) => s + b.grootte, 0)
 
   return (
@@ -75,13 +89,33 @@ export default function MijnBestandenPage() {
           </span>
         ))}
         {huidigeMap != null && (
-          <button onClick={() => setDeel({ soort: 'map', id: huidigeMap, naam: kruimels[kruimels.length - 1]?.naam || 'map' })} className="ml-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Deze map delen</button>
+          <span className="ml-2 flex gap-1.5">
+            <button onClick={() => setDeel({ soort: 'map', id: huidigeMap, naam: kruimels[kruimels.length - 1]?.naam || 'map' })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Deze map delen</button>
+            <a href={`/api/download-zip?map=${huidigeMap}`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">⬇️ Map als zip</a>
+          </span>
         )}
       </div>
 
       <Uploader onKlaar={() => laad(huidigeMap)} mapId={huidigeMap} />
 
       <div className="mt-8">
+        {/* Selectiebalk */}
+        {bestanden.length > 0 && (
+          <div className="flex items-center gap-3 mb-3 text-sm">
+            <label className="flex items-center gap-2 text-gray-400 cursor-pointer">
+              <input type="checkbox" checked={selectie.size === bestanden.length && bestanden.length > 0} onChange={allesSel} />
+              Alles
+            </label>
+            {selectie.size > 0 && (
+              <>
+                <span className="text-gray-400">{selectie.size} geselecteerd</span>
+                <button onClick={downloadSelectie} className="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium text-xs">⬇️ Download {selectie.size} als zip</button>
+                <button onClick={() => setSelectie(new Set())} className="text-gray-400 hover:text-white underline text-xs">Wis selectie</button>
+              </>
+            )}
+          </div>
+        )}
+
         {laden ? (
           <div className="text-gray-500 text-sm py-8 text-center">Laden…</div>
         ) : mappen.length === 0 && bestanden.length === 0 ? (
@@ -98,6 +132,7 @@ export default function MijnBestandenPage() {
                 </button>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => setDeel({ soort: 'map', id: m.id, naam: m.naam })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
+                  <a href={`/api/download-zip?map=${m.id}`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5" title="Map als zip downloaden">⬇️</a>
                   <button onClick={() => hernoemMap(m)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5">✏️</button>
                   <button onClick={() => wisMap(m)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-2.5 py-1.5">🗑️</button>
                 </div>
@@ -106,7 +141,8 @@ export default function MijnBestandenPage() {
 
             {/* Bestanden */}
             {bestanden.map(b => (
-              <div key={`b${b.id}`} className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 flex items-center gap-3">
+              <div key={`b${b.id}`} className={`bg-gray-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectie.has(b.id) ? 'border-amber-500/60' : 'border-gray-800'}`}>
+                <input type="checkbox" checked={selectie.has(b.id)} onChange={() => toggleSel(b.id)} className="shrink-0" />
                 <span className="text-2xl shrink-0">{bestandIcoon(b.mime, b.originele_naam)}</span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-sm">{b.originele_naam}</div>
@@ -134,52 +170,6 @@ export default function MijnBestandenPage() {
 
       {deel && <DeelDialog doel={deel} initieelTab={deel.tab} onClose={() => setDeel(null)} onWijziging={() => laad(huidigeMap)} />}
       {verplaats && <VerplaatsDialog bestand={verplaats} onClose={() => setVerplaats(null)} onKlaar={() => { setVerplaats(null); laad(huidigeMap) }} />}
-    </div>
-  )
-}
-
-// ── Bestand naar een map verplaatsen ──────────────────────────────────────────
-function VerplaatsDialog({ bestand, onClose, onKlaar }: { bestand: Bestand; onClose: () => void; onKlaar: () => void }) {
-  const [mappen, setMappen] = useState<{ id: number; naam: string; pad: string }[]>([])
-  useEffect(() => {
-    (async () => {
-      // Verzamel alle eigen mappen (plat, met pad) door de boom te doorlopen.
-      const alle: { id: number; naam: string; pad: string }[] = []
-      async function loop(ouder: number | null, prefix: string) {
-        const r = await fetch(`/api/mappen${ouder != null ? `?map=${ouder}` : ''}`)
-        if (!r.ok) return
-        const d = await r.json()
-        for (const m of d.mappen as { id: number; naam: string }[]) {
-          const pad = `${prefix}${m.naam}`
-          alle.push({ id: m.id, naam: m.naam, pad })
-          await loop(m.id, `${pad} / `)
-        }
-      }
-      await loop(null, '')
-      setMappen(alle)
-    })()
-  }, [])
-
-  async function verplaatsNaar(mapId: number | null) {
-    await fetch('/api/bestanden', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: bestand.id, map_id: mapId }) })
-    onKlaar()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-          <div className="font-semibold text-sm truncate">Verplaats: {bestand.originele_naam}</div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800">✕</button>
-        </div>
-        <div className="p-3 space-y-1">
-          <button onClick={() => verplaatsNaar(null)} className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-gray-800">🏠 Hoofdmap</button>
-          {mappen.map(m => (
-            <button key={m.id} onClick={() => verplaatsNaar(m.id)} className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-gray-800">📂 {m.pad}</button>
-          ))}
-          {mappen.length === 0 && <div className="text-xs text-gray-500 px-3 py-2">Je hebt nog geen mappen. Maak er een aan met “Nieuwe map”.</div>}
-        </div>
-      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['better-sqlite3', 'adm-zip'],
+  serverExternalPackages: ['better-sqlite3', 'adm-zip', 'archiver'],
   allowedDevOrigins: ['192.168.2.42', 'share.local'],
 };
 

@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatBytes } from '@/lib/format'
 
 const CHUNK = 8 * 1024 * 1024 // 8 MB per stuk
@@ -28,25 +28,30 @@ export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => voi
   const [taken, setTaken] = useState<Taak[]>([])
   const [sleep, setSleep] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const mapInputRef = useRef<HTMLInputElement>(null)
+
+  // 'webkitdirectory' is geen standaard React-attribuut → via ref zetten.
+  useEffect(() => {
+    const el = mapInputRef.current
+    if (el) { el.setAttribute('webkitdirectory', ''); el.setAttribute('directory', '') }
+  }, [])
 
   const update = useCallback((id: string, patch: Partial<Taak>) => {
     setTaken(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)))
   }, [])
 
-  const uploadEen = useCallback(async (taakId: string, file: File) => {
+  const uploadEen = useCallback(async (taakId: string, file: File, doelMap: number | null) => {
     update(taakId, { status: 'bezig', verzonden: 0 })
     try {
-      // 1) Start
       const startR = await fetch('/api/upload/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ naam: file.name, grootte: file.size, mime: file.type || 'application/octet-stream', map_id: mapId }),
+        body: JSON.stringify({ naam: file.name, grootte: file.size, mime: file.type || 'application/octet-stream', map_id: doelMap }),
       })
       const startD = await startR.json()
       if (!startR.ok) throw new Error(startD.error || 'Kon upload niet starten')
       const uploadId: string = startD.upload_id
 
-      // 2) Chunks (met hervatten bij 409)
       let offset = 0
       while (offset < file.size) {
         const eind = Math.min(offset + CHUNK, file.size)
@@ -56,18 +61,13 @@ export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => voi
         while (true) {
           const res = await postChunk(uploadId, offset, blob)
           if (res.ok) { offset = res.ontvangen ?? eind; break }
-          if (res.status === 409 && typeof res.ontvangen === 'number') {
-            // Server staat elders — hervat vanaf werkelijke stand.
-            offset = res.ontvangen
-            break
-          }
+          if (res.status === 409 && typeof res.ontvangen === 'number') { offset = res.ontvangen; break }
           if (++poging >= 3) throw new Error('Upload van een deel mislukte')
           await new Promise(r => setTimeout(r, 500 * poging))
         }
         update(taakId, { verzonden: offset })
       }
 
-      // 3) Afronden
       const finR = await fetch(`/api/upload/finish?id=${encodeURIComponent(uploadId)}`, { method: 'POST' })
       const finD = await finR.json()
       if (!finR.ok) throw new Error(finD.error || 'Afronden mislukte')
@@ -77,8 +77,9 @@ export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => voi
     } catch (e) {
       update(taakId, { status: 'fout', fout: e instanceof Error ? e.message : 'Onbekende fout' })
     }
-  }, [onKlaar, update, mapId])
+  }, [onKlaar, update])
 
+  // Losse bestanden → in de huidige map.
   const voegToe = useCallback(async (files: FileList | File[]) => {
     const lijst = Array.from(files)
     const nieuw: Taak[] = lijst.map(f => ({
@@ -86,11 +87,46 @@ export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => voi
       naam: f.name, grootte: f.size, verzonden: 0, status: 'wacht',
     }))
     setTaken(prev => [...nieuw, ...prev])
-    // Sequentieel uploaden (grote bestanden — netwerk niet overbelasten).
-    for (let i = 0; i < lijst.length; i++) {
-      await uploadEen(nieuw[i].id, lijst[i])
+    for (let i = 0; i < lijst.length; i++) await uploadEen(nieuw[i].id, lijst[i], mapId)
+  }, [uploadEen, mapId])
+
+  // Hele map (incl. submappen) → maak de mapstructuur na, upload elk bestand erin.
+  const voegMapToe = useCallback(async (files: FileList) => {
+    const lijst = Array.from(files)
+    if (lijst.length === 0) return
+    const nieuw: Taak[] = lijst.map(f => {
+      const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name
+      return { id: `${rel}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, naam: rel, grootte: f.size, verzonden: 0, status: 'wacht' as const }
+    })
+    setTaken(prev => [...nieuw, ...prev])
+
+    // Cache van mappad → aangemaakte map-id. Maakt ontbrekende mappen aan.
+    const dirCache = new Map<string, number | null>()
+    async function ensureDir(segs: string[]): Promise<number | null> {
+      let key = ''
+      let parent: number | null = mapId
+      for (const seg of segs) {
+        key = key ? `${key}/${seg}` : seg
+        if (dirCache.has(key)) { parent = dirCache.get(key)!; continue }
+        const r = await fetch('/api/mappen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ naam: seg, ouder_id: parent }) })
+        const d = await r.json()
+        const id = r.ok ? Number(d.id) : parent
+        dirCache.set(key, id)
+        parent = id
+      }
+      return parent
     }
-  }, [uploadEen])
+
+    for (let i = 0; i < lijst.length; i++) {
+      const f = lijst[i]
+      const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name
+      const segs = rel.split('/').filter(Boolean)
+      const dirSegs = segs.slice(0, -1)
+      const doel = dirSegs.length ? await ensureDir(dirSegs) : mapId
+      await uploadEen(nieuw[i].id, f, doel)
+    }
+    onKlaar()
+  }, [uploadEen, mapId, onKlaar])
 
   return (
     <div>
@@ -106,17 +142,18 @@ export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => voi
         <div className="text-4xl mb-2">⬆️</div>
         <div className="font-medium">Sleep bestanden hierheen of klik om te kiezen</div>
         <div className="text-xs text-gray-500 mt-1">Grote bestanden worden in stukken geüpload en kunnen hervatten.</div>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={e => { if (e.target.files?.length) voegToe(e.target.files); e.target.value = '' }}
-        />
+        <div className="mt-3">
+          <button
+            onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }}
+            className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium"
+          >📁 Map uploaden (incl. submappen)</button>
+        </div>
+        <input ref={inputRef} type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) voegToe(e.target.files); e.target.value = '' }} />
+        <input ref={mapInputRef} type="file" className="hidden" onChange={e => { if (e.target.files?.length) voegMapToe(e.target.files); e.target.value = '' }} />
       </div>
 
       {taken.length > 0 && (
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2 max-h-72 overflow-y-auto">
           {taken.map(t => {
             const pct = t.grootte > 0 ? Math.round((t.verzonden / t.grootte) * 100) : (t.status === 'klaar' ? 100 : 0)
             return (

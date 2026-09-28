@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import DeelDialog from '@/components/DeelDialog'
+import VerplaatsDialog from '@/components/VerplaatsDialog'
 import { useGebruiker } from '@/components/AuthGate'
 import { formatBytes, formatDatumKort, bestandIcoon } from '@/lib/format'
 
@@ -28,15 +29,18 @@ export default function BeheerPage() {
 }
 
 // ── Alle bestanden ────────────────────────────────────────────────────────────
-type Bestand = { id: number; originele_naam: string; mime: string; grootte: number; created_at: string; eigenaar_naam: string; aantal_links: number; aantal_accounts: number; downloads: number }
+type Bestand = { id: number; originele_naam: string; mime: string; grootte: number; created_at: string; eigenaar_id: number; eigenaar_naam: string; aantal_links: number; aantal_accounts: number; downloads: number }
 function AlleBestanden() {
   const [bestanden, setBestanden] = useState<Bestand[]>([])
   const [laden, setLaden] = useState(true)
   const [deel, setDeel] = useState<Bestand | null>(null)
+  const [verplaats, setVerplaats] = useState<Bestand | null>(null)
+  const [selectie, setSelectie] = useState<Set<number>>(new Set())
 
   const laad = useCallback(async () => {
     const r = await fetch('/api/bestanden?alle=1')
     if (r.ok) setBestanden((await r.json()).bestanden)
+    setSelectie(new Set())
     setLaden(false)
   }, [])
   useEffect(() => { laad() }, [laad])
@@ -46,13 +50,22 @@ function AlleBestanden() {
     await fetch('/api/bestanden', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.id }) })
     laad()
   }
+  function toggleSel(id: number) { setSelectie(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
 
   if (laden) return <div className="text-gray-500 text-sm py-8 text-center">Laden…</div>
   if (bestanden.length === 0) return <div className="text-gray-500 text-sm py-10 text-center bg-gray-900 border border-gray-800 rounded-2xl">Nog geen bestanden.</div>
   return (
     <div className="space-y-2">
+      {selectie.size > 0 && (
+        <div className="flex items-center gap-3 text-sm mb-1">
+          <span className="text-gray-400">{selectie.size} geselecteerd</span>
+          <button onClick={() => { window.location.href = `/api/download-zip?ids=${[...selectie].join(',')}` }} className="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium text-xs">⬇️ Download {selectie.size} als zip</button>
+          <button onClick={() => setSelectie(new Set())} className="text-gray-400 hover:text-white underline text-xs">Wis selectie</button>
+        </div>
+      )}
       {bestanden.map(b => (
-        <div key={b.id} className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 flex items-center gap-3">
+        <div key={b.id} className={`bg-gray-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectie.has(b.id) ? 'border-amber-500/60' : 'border-gray-800'}`}>
+          <input type="checkbox" checked={selectie.has(b.id)} onChange={() => toggleSel(b.id)} className="shrink-0" />
           <span className="text-2xl shrink-0">{bestandIcoon(b.mime, b.originele_naam)}</span>
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium text-sm">{b.originele_naam}</div>
@@ -64,12 +77,14 @@ function AlleBestanden() {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button onClick={() => setDeel(b)} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-            <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5">⬇️</a>
-            <button onClick={() => verwijder(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5">🗑️</button>
+            <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5" title="Verplaatsen">↔️</button>
+            <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5">⬇️</a>
+            <button onClick={() => verwijder(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-2.5 py-1.5">🗑️</button>
           </div>
         </div>
       ))}
       {deel && <DeelDialog doel={{ soort: 'bestand', id: deel.id, naam: deel.originele_naam, mime: deel.mime }} onClose={() => setDeel(null)} onWijziging={laad} />}
+      {verplaats && <VerplaatsDialog bestand={verplaats} eigenaarId={verplaats.eigenaar_id} onClose={() => setVerplaats(null)} onKlaar={() => { setVerplaats(null); laad() }} />}
     </div>
   )
 }
