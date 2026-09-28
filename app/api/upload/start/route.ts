@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { getDb, UPLOAD_TMP_DIR } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
+import { magMapUploaden } from '@/lib/deel'
 
 export const runtime = 'nodejs'
 
@@ -33,12 +34,13 @@ export async function POST(req: NextRequest) {
 
   const db = getDb()
 
-  // Optioneel: in welke (eigen) map komt het bestand?
+  // Optioneel: in welke map komt het bestand? Je eigen map, of een teammap waar
+  // je uploadrechten op hebt (gedeeld met 'mag uploaden').
   let mapId: number | null = null
   if (map_id != null) {
     mapId = Number(map_id)
-    if (!db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(mapId, g.id)) {
-      return NextResponse.json({ error: 'Doelmap niet gevonden' }, { status: 400 })
+    if (!magMapUploaden(g, mapId)) {
+      return NextResponse.json({ error: 'Geen uploadrechten op deze map' }, { status: 403 })
     }
   }
 

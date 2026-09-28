@@ -213,6 +213,13 @@ function migrate(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_deelmap_map ON deel_map(map_id);
   `)
+  // mag_uploaden: 0 = alleen lezen/downloaden; 1 = leden mogen ook bijdragen (teammap).
+  {
+    const cols = db.prepare('PRAGMA table_info(deel_map)').all() as { name: string }[]
+    if (!cols.some(c => c.name === 'mag_uploaden')) {
+      db.exec('ALTER TABLE deel_map ADD COLUMN mag_uploaden INTEGER NOT NULL DEFAULT 0')
+    }
+  }
 
   // ── Lopende uploads (hervatbaar / chunked) ────────────────────────────────────
   db.exec(`

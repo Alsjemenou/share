@@ -3,16 +3,19 @@ import { useCallback, useEffect, useState } from 'react'
 import Uploader from '@/components/Uploader'
 import DeelDialog, { type DeelDoel } from '@/components/DeelDialog'
 import VerplaatsDialog from '@/components/VerplaatsDialog'
+import { useGebruiker } from '@/components/AuthGate'
 import { formatBytes, formatDatumKort, bestandIcoon } from '@/lib/format'
 
 type Map = { id: number; naam: string; aantal_submappen: number; aantal_bestanden: number }
 type Bestand = {
   id: number; originele_naam: string; mime: string; grootte: number; created_at: string
+  eigenaar_id: number; eigenaar_naam: string
   aantal_links: number; aantal_accounts: number; aantal_groepen: number; downloads: number
 }
 type Kruimel = { id: number; naam: string }
 
 export default function MijnBestandenPage() {
+  const { gebruiker } = useGebruiker()
   const [huidigeMap, setHuidigeMap] = useState<number | null>(null)
   const [kruimels, setKruimels] = useState<Kruimel[]>([])
   const [mappen, setMappen] = useState<Map[]>([])
@@ -147,6 +150,7 @@ export default function MijnBestandenPage() {
                   <div className="truncate font-medium text-sm">{b.originele_naam}</div>
                   <div className="text-xs text-gray-500 flex flex-wrap gap-x-3">
                     <span>{formatBytes(b.grootte)}</span>
+                    {b.eigenaar_id !== gebruiker?.id && <span className="text-amber-400">van {b.eigenaar_naam}</span>}
                     <span>{formatDatumKort(b.created_at)}</span>
                     {b.aantal_links > 0 && <span>🔗 {b.aantal_links}</span>}
                     {b.aantal_accounts > 0 && <span>👤 {b.aantal_accounts}</span>}
@@ -155,10 +159,16 @@ export default function MijnBestandenPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button onClick={() => setDeel({ soort: 'bestand', id: b.id, naam: b.originele_naam, mime: b.mime, tab: b.aantal_links > 0 ? 'link' : 'delen' })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-                  <button onClick={() => setVerplaats([b])} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
-                  <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
-                  <button onClick={() => wisBestand(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
+                  {(b.eigenaar_id === gebruiker?.id || gebruiker?.is_admin) ? (
+                    <>
+                      <button onClick={() => setDeel({ soort: 'bestand', id: b.id, naam: b.originele_naam, mime: b.mime, tab: b.aantal_links > 0 ? 'link' : 'delen' })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
+                      <button onClick={() => setVerplaats([b])} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
+                      <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
+                      <button onClick={() => wisBestand(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
+                    </>
+                  ) : (
+                    <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
+                  )}
                 </div>
               </div>
             ))}

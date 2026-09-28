@@ -9,8 +9,8 @@ type Link = {
   id: number; token: string; verloopt_op: string | null; max_downloads: number | null
   download_count: number; actief: number; created_at: string; heeft_wachtwoord: number; modus: string
 }
-type Account = { id: number; weergavenaam: string; email: string | null; status: string; invite_token: string | null }
-type Groep = { id: number; naam: string; aantal_leden: number }
+type Account = { id: number; weergavenaam: string; email: string | null; status: string; invite_token: string | null; mag_uploaden?: number }
+type Groep = { id: number; naam: string; aantal_leden: number; mag_uploaden?: number }
 type MijnGroep = { id: number; naam: string; aantal_leden: number }
 type Log = { tijd: string; ip: string | null; deel_link_id: number | null; gebruiker_naam: string | null }
 
@@ -75,6 +75,7 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
   const [invite, setInvite] = useState('')
   const [fout, setFout] = useState('')
   const [bezig, setBezig] = useState(false)
+  const [magUploaden, setMagUploaden] = useState(false)
 
   const laad = useCallback(async () => {
     const rg = await fetch('/api/groepen'); if (rg.ok) setMijnGroepen((await rg.json()).groepen)
@@ -93,7 +94,7 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
     setBezig(true); setFout(''); setInvite('')
     try {
       const url = isBestand ? '/api/deel/account' : '/api/deel/map'
-      const body = isBestand ? { bestand_id: doel.id, ontvanger } : { map_id: doel.id, ontvanger }
+      const body = isBestand ? { bestand_id: doel.id, ontvanger } : { map_id: doel.id, ontvanger, mag_uploaden: magUploaden }
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json()
       if (!r.ok) { setFout(d.error || 'Kon niet delen'); return }
@@ -108,7 +109,7 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
     setBezig(true); setFout('')
     try {
       const url = isBestand ? '/api/deel/groep' : '/api/deel/map'
-      const body = isBestand ? { bestand_id: doel.id, groep_id: gid } : { map_id: doel.id, groep_id: gid }
+      const body = isBestand ? { bestand_id: doel.id, groep_id: gid } : { map_id: doel.id, groep_id: gid, mag_uploaden: magUploaden }
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!r.ok) { setFout((await r.json()).error || 'Kon niet delen'); return }
       setKiesGroep(''); await laad(); onWijziging?.()
@@ -128,6 +129,17 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
 
   return (
     <div className="space-y-5">
+      {/* Teammap-optie (alleen bij een map) */}
+      {!isBestand && (
+        <label className={`flex items-start gap-2 text-sm rounded-lg p-2.5 cursor-pointer ${magUploaden ? 'bg-amber-500/10 border border-amber-500/40' : 'bg-gray-800'}`}>
+          <input type="checkbox" checked={magUploaden} onChange={e => setMagUploaden(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="font-medium">🤝 Teammap — leden mogen ook uploaden</span>
+            <span className="block text-xs text-gray-500 mt-0.5">Aan: wie je hierna toevoegt kan zelf bestanden in deze map zetten en ziet alles wat erin staat. Uit: alleen bekijken/downloaden.</span>
+          </span>
+        </label>
+      )}
+
       {/* Groep */}
       <div>
         <div className="text-xs text-gray-400 mb-1">Delen met een groep</div>
@@ -173,7 +185,7 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
           {groepen.map(gr => (
             <div key={`g${gr.id}`} className="bg-gray-800 rounded-xl p-3 flex items-center gap-3">
               <span className="text-lg">👥</span>
-              <div className="flex-1 min-w-0"><div className="text-sm truncate">{gr.naam}</div><div className="text-xs text-gray-500">groep · {gr.aantal_leden} lid{gr.aantal_leden === 1 ? '' : 'eren'}</div></div>
+              <div className="flex-1 min-w-0"><div className="text-sm truncate">{gr.naam}{gr.mag_uploaden ? <span className="text-amber-400 text-xs"> · 🤝 mag uploaden</span> : null}</div><div className="text-xs text-gray-500">groep · {gr.aantal_leden} lid{gr.aantal_leden === 1 ? '' : 'eren'}</div></div>
               <button onClick={() => wisGroep(gr.id)} className="text-xs text-gray-400 hover:text-red-300 underline">Intrekken</button>
             </div>
           ))}
@@ -181,7 +193,7 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
             <div key={`a${a.id}`} className="bg-gray-800 rounded-xl p-3 flex items-center gap-3">
               <span className="text-lg">👤</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm truncate">{a.weergavenaam}{a.email && a.email !== a.weergavenaam ? <span className="text-gray-500"> · {a.email}</span> : null}</div>
+                <div className="text-sm truncate">{a.weergavenaam}{a.email && a.email !== a.weergavenaam ? <span className="text-gray-500"> · {a.email}</span> : null}{a.mag_uploaden ? <span className="text-amber-400 text-xs"> · 🤝 mag uploaden</span> : null}</div>
                 <div className="text-xs text-gray-500">{a.status === 'uitgenodigd' ? '⏳ uitgenodigd' : '✓ actief'}</div>
                 {a.status === 'uitgenodigd' && a.invite_token && (
                   <div className="flex items-center gap-2 mt-1">

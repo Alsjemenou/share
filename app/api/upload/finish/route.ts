@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { getDb, BESTAND_DIR } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
+import { magMapUploaden } from '@/lib/deel'
 
 export const runtime = 'nodejs'
 
@@ -41,9 +42,8 @@ export async function POST(req: NextRequest) {
     try { fs.unlinkSync(s.tmp_pad) } catch { /* nvt */ }
   }
 
-  // Map nog geldig? (kan verwijderd zijn tijdens de upload) → anders hoofdmap.
-  const mapId = s.map_id != null && db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(s.map_id, g.id)
-    ? s.map_id : null
+  // Map nog geldig + mag de gebruiker er (nog) in uploaden? → anders hoofdmap.
+  const mapId = s.map_id != null && magMapUploaden(g, s.map_id) ? s.map_id : null
 
   const r = db.prepare(`
     INSERT INTO bestand (eigenaar_id, opgeslagen_naam, originele_naam, mime, grootte, map_id)

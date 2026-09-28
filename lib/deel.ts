@@ -107,6 +107,29 @@ export function magMapZien(g: Gebruiker, mapId: number): boolean {
   return !!via
 }
 
+// Mag deze gebruiker bijdragen (uploaden) in deze map? Eigenaar | beheerder |
+// de map of een voorouder is met de gebruiker/zijn groep gedeeld als teammap
+// (deel_map.mag_uploaden = 1).
+export function magMapUploaden(g: Gebruiker, mapId: number): boolean {
+  if (g.is_admin) return true
+  const db = getDb()
+  const m = db.prepare('SELECT eigenaar_id FROM map WHERE id = ?').get(mapId) as { eigenaar_id: number } | undefined
+  if (!m) return false
+  if (m.eigenaar_id === g.id) return true
+  const via = db.prepare(`
+    WITH RECURSIVE keten(id) AS (
+      SELECT @m
+      UNION
+      SELECT mm.ouder_id FROM map mm JOIN keten k ON mm.id = k.id WHERE mm.ouder_id IS NOT NULL
+    )
+    SELECT 1 FROM deel_map dm WHERE dm.map_id IN (SELECT id FROM keten) AND dm.mag_uploaden = 1 AND (
+      (dm.ontvanger_type = 'account' AND dm.ontvanger_id = @u)
+      OR (dm.ontvanger_type = 'groep' AND dm.ontvanger_id IN (SELECT groep_id FROM groep_lid WHERE gebruiker_id = @u))
+    ) LIMIT 1
+  `).get({ m: mapId, u: g.id })
+  return !!via
+}
+
 // Beheerrecht (delen/hernoemen/verplaatsen/verwijderen): eigenaar of beheerder.
 export function magBestandBeheren(g: Gebruiker, bestandId: number): boolean {
   if (g.is_admin) return true

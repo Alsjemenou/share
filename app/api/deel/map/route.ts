@@ -16,12 +16,12 @@ export async function GET(req: NextRequest) {
   const db = getDb()
 
   const accounts = db.prepare(`
-    SELECT dm.id, u.id AS gebruiker_id, u.weergavenaam, u.email, u.status, u.invite_token
+    SELECT dm.id, dm.mag_uploaden, u.id AS gebruiker_id, u.weergavenaam, u.email, u.status, u.invite_token
     FROM deel_map dm JOIN gebruiker u ON u.id = dm.ontvanger_id
     WHERE dm.map_id = ? AND dm.ontvanger_type = 'account' ORDER BY u.weergavenaam COLLATE NOCASE
   `).all(mapId)
   const groepen = db.prepare(`
-    SELECT dm.id, gr.id AS groep_id, gr.naam,
+    SELECT dm.id, dm.mag_uploaden, gr.id AS groep_id, gr.naam,
            (SELECT COUNT(*) FROM groep_lid gl WHERE gl.groep_id = gr.id) AS aantal_leden
     FROM deel_map dm JOIN groep gr ON gr.id = dm.ontvanger_id
     WHERE dm.map_id = ? AND dm.ontvanger_type = 'groep' ORDER BY gr.naam COLLATE NOCASE
@@ -33,17 +33,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { map_id, groep_id, ontvanger } = await req.json()
+  const { map_id, groep_id, ontvanger, mag_uploaden } = await req.json()
   if (!magMapBeheren(g, Number(map_id))) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
   const db = getDb()
+  const upload = mag_uploaden ? 1 : 0
 
   // ── Met een groep ─────────────────────────────────────────────────────────
   if (groep_id != null) {
     if (!db.prepare('SELECT 1 FROM groep WHERE id = ? AND eigenaar_id = ?').get(groep_id, g.id)) {
       return NextResponse.json({ error: 'Groep niet gevonden' }, { status: 400 })
     }
-    db.prepare("INSERT OR IGNORE INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door) VALUES (?, 'groep', ?, ?)")
-      .run(Number(map_id), Number(groep_id), g.id)
+    db.prepare(`
+      INSERT INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door, mag_uploaden) VALUES (?, 'groep', ?, ?, ?)
+      ON CONFLICT(map_id, ontvanger_type, ontvanger_id) DO UPDATE SET mag_uploaden = excluded.mag_uploaden
+    `).run(Number(map_id), Number(groep_id), g.id, upload)
     return NextResponse.json({ ok: true })
   }
 
@@ -73,8 +76,10 @@ export async function POST(req: NextRequest) {
     nieuweUitnodiging = true
   }
 
-  db.prepare("INSERT OR IGNORE INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door) VALUES (?, 'account', ?, ?)")
-    .run(Number(map_id), account.id, g.id)
+  db.prepare(`
+    INSERT INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door, mag_uploaden) VALUES (?, 'account', ?, ?, ?)
+    ON CONFLICT(map_id, ontvanger_type, ontvanger_id) DO UPDATE SET mag_uploaden = excluded.mag_uploaden
+  `).run(Number(map_id), account.id, g.id, upload)
 
   const uitnodiging = account.status !== 'actief' && account.invite_token
     ? { token: account.invite_token, nieuw: nieuweUitnodiging } : null

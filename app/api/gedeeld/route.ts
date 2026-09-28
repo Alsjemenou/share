@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
-import { magMapZien } from '@/lib/deel'
+import { magMapZien, magMapUploaden } from '@/lib/deel'
 
 export const runtime = 'nodejs'
 
@@ -39,11 +39,12 @@ export async function GET(req: NextRequest) {
     const mappen = (db.prepare('SELECT id, naam FROM map WHERE ouder_id = ? ORDER BY naam COLLATE NOCASE').all(mapId) as
       { id: number; naam: string }[]).map(m => ({ ...m, ...mapCounts(m.id) }))
     const bestanden = db.prepare(`
-      SELECT b.id, b.originele_naam, b.mime, b.grootte, b.created_at, e.weergavenaam AS eigenaar_naam
+      SELECT b.id, b.originele_naam, b.mime, b.grootte, b.created_at, b.eigenaar_id, e.weergavenaam AS eigenaar_naam
       FROM bestand b JOIN gebruiker e ON e.id = b.eigenaar_id
       WHERE b.map_id = ? ORDER BY b.created_at DESC
     `).all(mapId)
-    return NextResponse.json({ huidige_map: mapId, kruimels, mappen, bestanden })
+    // Teammap? Dan mag de gebruiker hier ook uploaden en eigen bijdragen verwijderen.
+    return NextResponse.json({ huidige_map: mapId, kruimels, mappen, bestanden, mag_uploaden: magMapUploaden(g, mapId) })
   }
 
   // ── Wortel: toppen van gedeelde mapbomen + losse gedeelde bestanden ────────

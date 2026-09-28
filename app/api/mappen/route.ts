@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
-import { magMapBeheren } from '@/lib/deel'
+import { magMapBeheren, magMapUploaden } from '@/lib/deel'
 
 export const runtime = 'nodejs'
 
@@ -48,14 +48,16 @@ export async function GET(req: NextRequest) {
     ORDER BY m.naam COLLATE NOCASE
   `).all({ uid: g.id, map: mapId })
 
+  // In een map: toon ALLE bestanden erin (ook bijdragen van teamleden). In de
+  // hoofdmap: alleen je eigen losse bestanden.
   const bestanden = db.prepare(`
-    SELECT b.id, b.originele_naam, b.mime, b.grootte, b.created_at,
+    SELECT b.id, b.originele_naam, b.mime, b.grootte, b.created_at, b.eigenaar_id, e.weergavenaam AS eigenaar_naam,
            (SELECT COUNT(*) FROM deel_link dl WHERE dl.bestand_id = b.id AND dl.actief = 1) AS aantal_links,
            (SELECT COUNT(*) FROM deel_account da WHERE da.bestand_id = b.id) AS aantal_accounts,
            (SELECT COUNT(*) FROM deel_groep dg WHERE dg.bestand_id = b.id) AS aantal_groepen,
            (SELECT COUNT(*) FROM download_log lg WHERE lg.bestand_id = b.id) AS downloads
-    FROM bestand b
-    WHERE b.eigenaar_id = @uid AND ${mapId == null ? 'b.map_id IS NULL' : 'b.map_id = @map'}
+    FROM bestand b JOIN gebruiker e ON e.id = b.eigenaar_id
+    WHERE ${mapId == null ? 'b.eigenaar_id = @uid AND b.map_id IS NULL' : 'b.map_id = @map'}
     ORDER BY b.created_at DESC
   `).all({ uid: g.id, map: mapId })
 
@@ -70,11 +72,19 @@ export async function POST(req: NextRequest) {
   if (!naam || !String(naam).trim()) return NextResponse.json({ error: 'Geef de map een naam' }, { status: 400 })
   const db = getDb()
   const ouder = ouder_id != null ? Number(ouder_id) : null
-  if (ouder != null && !db.prepare('SELECT 1 FROM map WHERE id = ? AND eigenaar_id = ?').get(ouder, g.id)) {
-    return NextResponse.json({ error: 'Oudermap niet gevonden' }, { status: 400 })
+  // Nieuwe map hoort bij jou; maar een submap in een teammap (waar je uploadrechten
+  // op hebt) hoort bij de eigenaar van die teammap, zodat de mapboom bij elkaar blijft.
+  let eigenaar = g.id
+  if (ouder != null) {
+    const om = db.prepare('SELECT eigenaar_id FROM map WHERE id = ?').get(ouder) as { eigenaar_id: number } | undefined
+    if (!om) return NextResponse.json({ error: 'Oudermap niet gevonden' }, { status: 400 })
+    if (om.eigenaar_id !== g.id) {
+      if (!magMapUploaden(g, ouder)) return NextResponse.json({ error: 'Geen rechten op deze map' }, { status: 403 })
+      eigenaar = om.eigenaar_id
+    }
   }
   const r = db.prepare('INSERT INTO map (eigenaar_id, naam, ouder_id) VALUES (?, ?, ?)')
-    .run(g.id, String(naam).trim(), ouder)
+    .run(eigenaar, String(naam).trim(), ouder)
   return NextResponse.json({ id: Number(r.lastInsertRowid) })
 }
 
