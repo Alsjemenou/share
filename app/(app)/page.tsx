@@ -96,9 +96,7 @@ export default function MijnBestandenPage() {
         )}
       </div>
 
-      <Uploader onKlaar={() => laad(huidigeMap)} mapId={huidigeMap} />
-
-      <div className="mt-8">
+      <div className="mt-2">
         {/* Selectiebalk */}
         {bestanden.length > 0 && (
           <div className="flex items-center gap-3 mb-3 text-sm">
@@ -120,7 +118,7 @@ export default function MijnBestandenPage() {
         {laden ? (
           <div className="text-gray-500 text-sm py-8 text-center">Laden…</div>
         ) : mappen.length === 0 && bestanden.length === 0 ? (
-          <div className="text-gray-500 text-sm py-10 text-center bg-gray-900 border border-gray-800 rounded-2xl">Deze map is leeg. Sleep hierboven iets naar binnen of maak een submap.</div>
+          <div className="text-gray-500 text-sm py-10 text-center bg-gray-900 border border-gray-800 rounded-2xl">Deze map is leeg. Upload hieronder iets of maak een submap.</div>
         ) : (
           <div className="space-y-2">
             {/* Mappen */}
@@ -167,6 +165,12 @@ export default function MijnBestandenPage() {
           </div>
         )}
         {!laden && bestanden.length > 0 && <div className="text-xs text-gray-500 mt-3">{bestanden.length} bestand{bestanden.length === 1 ? '' : 'en'} in deze map · {formatBytes(totaal)}</div>}
+      </div>
+
+      {/* Upload-veld onderaan (compact), zoals de verkenner */}
+      <div className="mt-6">
+        <div className="text-xs text-gray-500 mb-1.5">Uploaden naar {huidigeMap == null ? 'hoofdmap' : (kruimels[kruimels.length - 1]?.naam || 'map')}</div>
+        <Uploader onKlaar={() => laad(huidigeMap)} mapId={huidigeMap} compact />
       </div>
 
       {deel && <DeelDialog doel={deel} initieelTab={deel.tab} onClose={() => setDeel(null)} onWijziging={() => laad(huidigeMap)} />}

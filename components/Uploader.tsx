@@ -24,7 +24,7 @@ async function postChunk(uploadId: string, offset: number, blob: Blob): Promise<
   return { ok: r.ok, ontvangen: d.ontvangen, status: r.status }
 }
 
-export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => void; mapId?: number | null }) {
+export default function Uploader({ onKlaar, mapId = null, compact = false }: { onKlaar: () => void; mapId?: number | null; compact?: boolean }) {
   const [taken, setTaken] = useState<Taak[]>([])
   const [sleep, setSleep] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -135,19 +135,26 @@ export default function Uploader({ onKlaar, mapId = null }: { onKlaar: () => voi
         onDragLeave={() => setSleep(false)}
         onDrop={e => { e.preventDefault(); setSleep(false); if (e.dataTransfer.files.length) voegToe(e.dataTransfer.files) }}
         onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
+        className={`cursor-pointer rounded-xl border-2 border-dashed text-center transition-colors ${compact ? 'p-4' : 'p-8'} ${
           sleep ? 'border-amber-500 bg-amber-500/10' : 'border-gray-700 hover:border-gray-600 bg-gray-900'
         }`}
       >
-        <div className="text-4xl mb-2">⬆️</div>
-        <div className="font-medium">Sleep bestanden hierheen of klik om te kiezen</div>
-        <div className="text-xs text-gray-500 mt-1">Grote bestanden worden in stukken geüpload en kunnen hervatten.</div>
-        <div className="mt-3">
-          <button
-            onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }}
-            className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium"
-          >📁 Map uploaden (incl. submappen)</button>
-        </div>
+        {compact ? (
+          <div className="flex items-center justify-center gap-x-3 gap-y-1 flex-wrap text-sm">
+            <span className="text-lg">⬆️</span>
+            <span className="font-medium">Sleep bestanden hierheen of klik om te kiezen</span>
+            <button onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1 font-medium">📁 Map uploaden</button>
+          </div>
+        ) : (
+          <>
+            <div className="text-4xl mb-2">⬆️</div>
+            <div className="font-medium">Sleep bestanden hierheen of klik om te kiezen</div>
+            <div className="text-xs text-gray-500 mt-1">Grote bestanden worden in stukken geüpload en kunnen hervatten.</div>
+            <div className="mt-3">
+              <button onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">📁 Map uploaden (incl. submappen)</button>
+            </div>
+          </>
+        )}
         <input ref={inputRef} type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) voegToe(e.target.files); e.target.value = '' }} />
         <input ref={mapInputRef} type="file" className="hidden" onChange={e => { if (e.target.files?.length) voegMapToe(e.target.files); e.target.value = '' }} />
       </div>
