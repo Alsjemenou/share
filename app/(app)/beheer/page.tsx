@@ -77,9 +77,9 @@ function AlleBestanden() {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button onClick={() => setDeel(b)} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-            <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5" title="Verplaatsen">↔️</button>
-            <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5">⬇️</a>
-            <button onClick={() => verwijder(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-2.5 py-1.5">🗑️</button>
+            <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
+            <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
+            <button onClick={() => verwijder(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
           </div>
         </div>
       ))}

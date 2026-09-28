@@ -132,9 +132,9 @@ export default function MijnBestandenPage() {
                 </button>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => setDeel({ soort: 'map', id: m.id, naam: m.naam })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-                  <a href={`/api/download-zip?map=${m.id}`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5" title="Map als zip downloaden">⬇️</a>
-                  <button onClick={() => hernoemMap(m)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5">✏️</button>
-                  <button onClick={() => wisMap(m)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-2.5 py-1.5">🗑️</button>
+                  <a href={`/api/download-zip?map=${m.id}`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium" title="Map als zip downloaden">Download</a>
+                  <button onClick={() => hernoemMap(m)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Hernoem</button>
+                  <button onClick={() => wisMap(m)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
                 </div>
               </div>
             ))}
@@ -157,9 +157,9 @@ export default function MijnBestandenPage() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => setDeel({ soort: 'bestand', id: b.id, naam: b.originele_naam, mime: b.mime, tab: b.aantal_links > 0 ? 'link' : 'delen' })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-                  <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5" title="Verplaatsen">↔️</button>
-                  <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-2.5 py-1.5">⬇️</a>
-                  <button onClick={() => wisBestand(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-2.5 py-1.5">🗑️</button>
+                  <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
+                  <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
+                  <button onClick={() => wisBestand(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
                 </div>
               </div>
             ))}
