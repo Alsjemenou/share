@@ -34,7 +34,7 @@ function AlleBestanden() {
   const [bestanden, setBestanden] = useState<Bestand[]>([])
   const [laden, setLaden] = useState(true)
   const [deel, setDeel] = useState<Bestand | null>(null)
-  const [verplaats, setVerplaats] = useState<Bestand | null>(null)
+  const [verplaats, setVerplaats] = useState<Bestand[] | null>(null)
   const [selectie, setSelectie] = useState<Set<number>>(new Set())
 
   const laad = useCallback(async () => {
@@ -57,9 +57,10 @@ function AlleBestanden() {
   return (
     <div className="space-y-2">
       {selectie.size > 0 && (
-        <div className="flex items-center gap-3 text-sm mb-1">
+        <div className="flex items-center gap-3 text-sm mb-1 flex-wrap">
           <span className="text-gray-400">{selectie.size} geselecteerd</span>
           <button onClick={() => { window.location.href = `/api/download-zip?ids=${[...selectie].join(',')}` }} className="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium text-xs">⬇️ Download {selectie.size} als zip</button>
+          <button onClick={() => setVerplaats(bestanden.filter(b => selectie.has(b.id)))} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium text-xs">↔️ Verplaats {selectie.size} naar map</button>
           <button onClick={() => setSelectie(new Set())} className="text-gray-400 hover:text-white underline text-xs">Wis selectie</button>
         </div>
       )}
@@ -77,14 +78,14 @@ function AlleBestanden() {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button onClick={() => setDeel(b)} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-            <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
+            <button onClick={() => setVerplaats([b])} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
             <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
             <button onClick={() => verwijder(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
           </div>
         </div>
       ))}
       {deel && <DeelDialog doel={{ soort: 'bestand', id: deel.id, naam: deel.originele_naam, mime: deel.mime }} onClose={() => setDeel(null)} onWijziging={laad} />}
-      {verplaats && <VerplaatsDialog bestand={verplaats} eigenaarId={verplaats.eigenaar_id} onClose={() => setVerplaats(null)} onKlaar={() => { setVerplaats(null); laad() }} />}
+      {verplaats && <VerplaatsDialog bestanden={verplaats} alleMappen onClose={() => setVerplaats(null)} onKlaar={() => { setVerplaats(null); laad() }} />}
     </div>
   )
 }

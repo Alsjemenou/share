@@ -19,7 +19,7 @@ export default function MijnBestandenPage() {
   const [bestanden, setBestanden] = useState<Bestand[]>([])
   const [laden, setLaden] = useState(true)
   const [deel, setDeel] = useState<(DeelDoel & { tab?: 'delen' | 'link' }) | null>(null)
-  const [verplaats, setVerplaats] = useState<Bestand | null>(null)
+  const [verplaats, setVerplaats] = useState<Bestand[] | null>(null)
   const [selectie, setSelectie] = useState<Set<number>>(new Set())
 
   const laad = useCallback(async (mapId: number | null) => {
@@ -110,6 +110,7 @@ export default function MijnBestandenPage() {
               <>
                 <span className="text-gray-400">{selectie.size} geselecteerd</span>
                 <button onClick={downloadSelectie} className="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium text-xs">⬇️ Download {selectie.size} als zip</button>
+                <button onClick={() => setVerplaats(bestanden.filter(b => selectie.has(b.id)))} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium text-xs">↔️ Verplaats {selectie.size}</button>
                 <button onClick={() => setSelectie(new Set())} className="text-gray-400 hover:text-white underline text-xs">Wis selectie</button>
               </>
             )}
@@ -157,7 +158,7 @@ export default function MijnBestandenPage() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => setDeel({ soort: 'bestand', id: b.id, naam: b.originele_naam, mime: b.mime, tab: b.aantal_links > 0 ? 'link' : 'delen' })} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
-                  <button onClick={() => setVerplaats(b)} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
+                  <button onClick={() => setVerplaats([b])} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
                   <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
                   <button onClick={() => wisBestand(b)} className="text-xs bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium">Verwijder</button>
                 </div>
@@ -169,7 +170,7 @@ export default function MijnBestandenPage() {
       </div>
 
       {deel && <DeelDialog doel={deel} initieelTab={deel.tab} onClose={() => setDeel(null)} onWijziging={() => laad(huidigeMap)} />}
-      {verplaats && <VerplaatsDialog bestand={verplaats} onClose={() => setVerplaats(null)} onKlaar={() => { setVerplaats(null); laad(huidigeMap) }} />}
+      {verplaats && <VerplaatsDialog bestanden={verplaats} onClose={() => setVerplaats(null)} onKlaar={() => { setVerplaats(null); laad(huidigeMap) }} />}
     </div>
   )
 }
