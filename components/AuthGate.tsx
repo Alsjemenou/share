@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, Suspense, useCallback, useContext, useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 
 export type Gebruiker = {
@@ -62,7 +62,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <GebruikerCtx.Provider value={{ gebruiker, merk, herlaad }}>
       <div className={`flex h-screen w-full ${merk?.kleur ? 'merk' : ''}`} style={merkStyle}>
-        <Sidebar />
+        <Suspense fallback={<aside className="hidden md:block w-52 shrink-0 bg-gray-900 border-r border-gray-800" />}>
+          <Sidebar />
+        </Suspense>
         <main className="flex-1 overflow-auto px-4 pb-6 pt-16 md:p-8 min-w-0">
           {children}
         </main>

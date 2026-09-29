@@ -1,11 +1,17 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useGebruiker } from '@/components/AuthGate'
 
 export default function InstellingenPage() {
+  return <Suspense fallback={null}><InstellingenInner /></Suspense>
+}
+
+function InstellingenInner() {
   const { gebruiker, herlaad } = useGebruiker()
   const { theme, setTheme } = useTheme()
+  const sectie = (useSearchParams().get('sectie') || 'profiel')
 
   const [weergavenaam, setWeergavenaam] = useState(gebruiker?.weergavenaam || '')
   const [huidig, setHuidig] = useState('')
@@ -27,9 +33,20 @@ export default function InstellingenPage() {
     } finally { setBezig(false) }
   }
 
+  if (sectie === 'huisstijl') {
+    return (
+      <div className="max-w-lg mx-auto">
+        <h1 className="text-2xl font-bold mb-6">Huisstijl</h1>
+        {gebruiker?.mag_branding
+          ? <Huisstijl onWijziging={herlaad} />
+          : <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-sm text-gray-400">Je hebt (nog) geen recht op een eigen huisstijl. Vraag de beheerder om dit aan te zetten.</div>}
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Instellingen</h1>
+      <h1 className="text-2xl font-bold mb-6">Profiel &amp; weergave</h1>
 
       <form onSubmit={opslaan} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold">Profiel</h2>
@@ -73,7 +90,6 @@ export default function InstellingenPage() {
         </div>
       </div>
 
-      {gebruiker?.mag_branding ? <Huisstijl onWijziging={herlaad} /> : null}
     </div>
   )
 }

@@ -1,13 +1,21 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import DeelDialog from '@/components/DeelDialog'
 import VerplaatsDialog from '@/components/VerplaatsDialog'
 import { useGebruiker } from '@/components/AuthGate'
 import { formatBytes, formatDatumKort, bestandIcoon } from '@/lib/format'
 
+const TITELS: Record<string, string> = { bestanden: '📦 Alle bestanden', personen: '👥 Users', backup: '💾 Back-up' }
+
 export default function BeheerPage() {
+  return <Suspense fallback={null}><BeheerInner /></Suspense>
+}
+
+function BeheerInner() {
   const { gebruiker } = useGebruiker()
-  const [tab, setTab] = useState<'bestanden' | 'personen' | 'backup'>('bestanden')
+  const params = useSearchParams()
+  const sectie = params.get('sectie') || 'bestanden'
 
   if (gebruiker && !gebruiker.is_admin) {
     return <div className="max-w-2xl mx-auto text-gray-500 py-10 text-center">Alleen voor beheerders.</div>
@@ -15,15 +23,10 @@ export default function BeheerPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Beheer</h1>
-      <div className="flex gap-1 mb-5">
-        {([['bestanden', '📦 Alle bestanden'], ['personen', '👥 Personen'], ['backup', '💾 Back-up']] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} className={`text-sm px-3 py-1.5 rounded-lg font-medium ${tab === id ? 'bg-amber-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>{label}</button>
-        ))}
-      </div>
-      {tab === 'bestanden' && <AlleBestanden />}
-      {tab === 'personen' && <Personen />}
-      {tab === 'backup' && <Backup />}
+      <h1 className="text-2xl font-bold mb-5">{TITELS[sectie] || 'Beheer'}</h1>
+      {sectie === 'bestanden' && <AlleBestanden />}
+      {sectie === 'personen' && <Personen />}
+      {sectie === 'backup' && <Backup />}
     </div>
   )
 }
