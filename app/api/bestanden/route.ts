@@ -80,26 +80,26 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true, verplaatst })
 }
 
-// Bestand verwijderen (eigenaar of beheerder) — incl. bestand op schijf.
+// Bestand(en) verwijderen (eigenaar of beheerder) — incl. bestand op schijf.
+// Eén via { id } of meerdere via { ids: [...] }.
 export async function DELETE(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
 
-  const { id } = await req.json()
+  const body = await req.json()
+  const ids: number[] = Array.isArray(body.ids) ? body.ids.map(Number) : (body.id != null ? [Number(body.id)] : [])
+  if (ids.length === 0) return NextResponse.json({ error: 'Geen bestanden' }, { status: 400 })
   const db = getDb()
-  const b = db.prepare('SELECT id, eigenaar_id, opgeslagen_naam FROM bestand WHERE id = ?').get(id) as
-    | { id: number; eigenaar_id: number; opgeslagen_naam: string }
-    | undefined
-  if (!b) return NextResponse.json({ error: 'Niet gevonden' }, { status: 404 })
-  if (b.eigenaar_id !== g.id && !g.is_admin) {
-    return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
+
+  let verwijderd = 0
+  for (const id of ids) {
+    const b = db.prepare('SELECT id, eigenaar_id, opgeslagen_naam FROM bestand WHERE id = ?').get(id) as
+      | { id: number; eigenaar_id: number; opgeslagen_naam: string } | undefined
+    if (!b) continue
+    if (b.eigenaar_id !== g.id && !g.is_admin) continue
+    db.prepare('DELETE FROM bestand WHERE id = ?').run(b.id) // links/deelaccounts cascaden mee
+    try { fs.unlinkSync(path.join(BESTAND_DIR, String(b.eigenaar_id), path.basename(b.opgeslagen_naam))) } catch { /* al weg */ }
+    verwijderd++
   }
-
-  db.prepare('DELETE FROM bestand WHERE id = ?').run(b.id) // links/deelaccounts cascaden mee
-  try {
-    const veilig = path.basename(b.opgeslagen_naam)
-    fs.unlinkSync(path.join(BESTAND_DIR, String(b.eigenaar_id), veilig))
-  } catch { /* al weg */ }
-
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, verwijderd })
 }

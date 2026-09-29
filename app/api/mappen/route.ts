@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import fs from 'fs'
+import path from 'path'
+import { getDb, BESTAND_DIR } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 import { magMapBeheren, magMapUploaden } from '@/lib/deel'
 
@@ -122,14 +124,34 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
-// Map verwijderen (submappen cascaden; bestanden gaan terug naar de hoofdmap).
+// Alle bestanden onder een map (recursief, incl. submappen).
+function bestandenOnderMap(mapId: number): { id: number; eigenaar_id: number; opgeslagen_naam: string }[] {
+  const db = getDb()
+  const uit = db.prepare('SELECT id, eigenaar_id, opgeslagen_naam FROM bestand WHERE map_id = ?').all(mapId) as
+    { id: number; eigenaar_id: number; opgeslagen_naam: string }[]
+  for (const s of db.prepare('SELECT id FROM map WHERE ouder_id = ?').all(mapId) as { id: number }[]) {
+    uit.push(...bestandenOnderMap(s.id))
+  }
+  return uit
+}
+
+// Map verwijderen. Standaard: submappen cascaden, bestanden gaan naar de hoofdmap.
+// Met { inclusief_bestanden: true } worden ook alle bestanden erin (en in submappen)
+// verwijderd (van schijf).
 export async function DELETE(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { id } = await req.json()
+  const { id, inclusief_bestanden } = await req.json()
   const db = getDb()
   const m = db.prepare('SELECT id FROM map WHERE id = ?').get(id) as { id: number } | undefined
   if (!m || !magMapBeheren(g, m.id)) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
-  db.prepare('DELETE FROM map WHERE id = ?').run(m.id) // submappen cascaden; bestand.map_id -> NULL
+
+  if (inclusief_bestanden) {
+    for (const b of bestandenOnderMap(m.id)) {
+      db.prepare('DELETE FROM bestand WHERE id = ?').run(b.id)
+      try { fs.unlinkSync(path.join(BESTAND_DIR, String(b.eigenaar_id), path.basename(b.opgeslagen_naam))) } catch { /* al weg */ }
+    }
+  }
+  db.prepare('DELETE FROM map WHERE id = ?').run(m.id) // submappen cascaden; overige bestand.map_id -> NULL
   return NextResponse.json({ ok: true })
 }

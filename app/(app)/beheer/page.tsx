@@ -51,6 +51,11 @@ function AlleBestanden() {
     laad()
   }
   function toggleSel(id: number) { setSelectie(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  async function verwijderSelectie() {
+    if (!confirm(`${selectie.size} bestand${selectie.size === 1 ? '' : 'en'} verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return
+    await fetch('/api/bestanden', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...selectie] }) })
+    laad()
+  }
 
   if (laden) return <div className="text-gray-500 text-sm py-8 text-center">Laden…</div>
   if (bestanden.length === 0) return <div className="text-gray-500 text-sm py-10 text-center bg-gray-900 border border-gray-800 rounded-2xl">Nog geen bestanden.</div>
@@ -61,6 +66,7 @@ function AlleBestanden() {
           <span className="text-gray-400">{selectie.size} geselecteerd</span>
           <button onClick={() => { window.location.href = `/api/download-zip?ids=${[...selectie].join(',')}` }} className="bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium text-xs">⬇️ Download {selectie.size} als zip</button>
           <button onClick={() => setVerplaats(bestanden.filter(b => selectie.has(b.id)))} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium text-xs">↔️ Verplaats {selectie.size} naar map</button>
+          <button onClick={verwijderSelectie} className="bg-gray-800 hover:bg-red-900/50 hover:text-red-300 rounded-lg px-3 py-1.5 font-medium text-xs">🗑️ Verwijder {selectie.size}</button>
           <button onClick={() => setSelectie(new Set())} className="text-gray-400 hover:text-white underline text-xs">Wis selectie</button>
         </div>
       )}
