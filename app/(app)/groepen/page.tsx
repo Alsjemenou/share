@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 type Lid = { id: number; gebruiker_id: number; weergavenaam: string; email: string | null }
-type Groep = { id: number; naam: string; aantal_leden: number; leden: Lid[] }
+type Groep = { id: number; naam: string; aantal_leden: number; leden: Lid[]; map_naam: string | null; aantal_bestanden: number }
 type Gebruiker = { id: number; weergavenaam: string; email: string | null }
 
 export default function GroepenPage() {
@@ -50,7 +50,7 @@ export default function GroepenPage() {
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Groepen</h1>
-        <p className="text-sm text-gray-500 mt-1">Zet mensen in een groep en deel bestanden of hele mappen in één keer met het hele team.</p>
+        <p className="text-sm text-gray-500 mt-1">Zet mensen in een groep. Elke nieuwe groep krijgt automatisch een <b>groepsmap</b> waar alle leden bij kunnen en bestanden in kunnen zetten (zichtbaar onder “Gedeeld met mij”).</p>
       </div>
 
       <form onSubmit={maak} className="flex gap-2 mb-5">
@@ -70,7 +70,10 @@ export default function GroepenPage() {
                 <span className="text-lg">👥</span>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold truncate">{gr.naam}</div>
-                  <div className="text-xs text-gray-500">{gr.aantal_leden} lid{gr.aantal_leden === 1 ? '' : 'eren'}</div>
+                  <div className="text-xs text-gray-500 flex flex-wrap gap-x-2">
+                    <span>{gr.aantal_leden} lid{gr.aantal_leden === 1 ? '' : 'eren'}</span>
+                    {gr.map_naam && <span className="text-amber-400/90">📁 groepsmap “{gr.map_naam}” · {gr.aantal_bestanden} bestand{gr.aantal_bestanden === 1 ? '' : 'en'}</span>}
+                  </div>
                 </div>
                 <button onClick={() => hernoem(gr)} className="text-xs text-gray-400 hover:text-white underline">Hernoem</button>
                 <button onClick={() => wis(gr)} className="text-xs text-gray-400 hover:text-red-300 underline">Verwijder</button>

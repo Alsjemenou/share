@@ -184,6 +184,13 @@ function migrate(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_groeplid_gebruiker ON groep_lid(gebruiker_id);
   `)
+  // Elke groep heeft een automatisch aangemaakte groepsmap (teammap).
+  {
+    const cols = db.prepare('PRAGMA table_info(groep)').all() as { name: string }[]
+    if (!cols.some(c => c.name === 'map_id')) {
+      db.exec('ALTER TABLE groep ADD COLUMN map_id INTEGER REFERENCES map(id) ON DELETE SET NULL')
+    }
+  }
 
   // ── Bestand gedeeld met een groep ─────────────────────────────────────────────
   db.exec(`
