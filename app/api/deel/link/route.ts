@@ -64,15 +64,28 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ token })
 }
 
-// Link in-/uitschakelen.
+// Link bijwerken: in-/uitschakelen (actief), verloop verlengen (verloop_dagen vanaf
+// nu, of verloopt_op = null om verloop te verwijderen), of max_downloads aanpassen.
 export async function PATCH(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { id, actief } = await req.json()
+  const { id, actief, verloop_dagen, verloopt_op, max_downloads } = await req.json()
   const db = getDb()
   const link = db.prepare('SELECT bestand_id FROM deel_link WHERE id = ?').get(id) as { bestand_id: number } | undefined
   if (!link || !magBeheren(g, link.bestand_id)) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
-  db.prepare('UPDATE deel_link SET actief = ? WHERE id = ?').run(actief ? 1 : 0, id)
+
+  if (actief !== undefined) db.prepare('UPDATE deel_link SET actief = ? WHERE id = ?').run(actief ? 1 : 0, id)
+  if (verloop_dagen !== undefined) {
+    const dagen = Number(verloop_dagen)
+    const nieuw = Number.isFinite(dagen) && dagen > 0 ? new Date(Date.now() + dagen * 86400_000).toISOString() : null
+    db.prepare('UPDATE deel_link SET verloopt_op = ? WHERE id = ?').run(nieuw, id)
+  } else if (verloopt_op !== undefined) {
+    db.prepare('UPDATE deel_link SET verloopt_op = ? WHERE id = ?').run(verloopt_op || null, id)
+  }
+  if (max_downloads !== undefined) {
+    const md = Number(max_downloads)
+    db.prepare('UPDATE deel_link SET max_downloads = ? WHERE id = ?').run(Number.isFinite(md) && md > 0 ? Math.floor(md) : null, id)
+  }
   return NextResponse.json({ ok: true })
 }
 

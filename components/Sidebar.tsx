@@ -8,8 +8,12 @@ type Kind = { label: string; path: string; sectie: string | null; brandingOnly?:
 type Item = { label: string; icon: string; href?: string; adminOnly?: boolean; kinderen?: Kind[] }
 
 const MENU: Item[] = [
-  { href: '/', label: 'Mijn bestanden', icon: '📁' },
-  { href: '/gedeeld', label: 'Gedeeld met mij', icon: '📥' },
+  {
+    href: '/', label: 'Mijn bestanden', icon: '📁', kinderen: [
+      { label: 'Gedeeld met mij', path: '/gedeeld', sectie: null },
+      { label: 'Gedeeld door mij', path: '/gedeeld-door-mij', sectie: null },
+    ],
+  },
   {
     label: 'Beheer', icon: '🛡️', adminOnly: true, kinderen: [
       { label: 'Alle bestanden', path: '/beheer', sectie: 'bestanden' },
@@ -121,9 +125,15 @@ export default function Sidebar() {
               )
             }
             const kinderen = zichtbareKinderen(item)
+            const parentHref = item.href || kindHref(kinderen[0])
+            // Parent met eigen pagina (Mijn bestanden) licht op als je erop staat;
+            // een pure sectiekop (Beheer/Instellingen) krijgt geen achtergrond.
+            const parentCls = item.href
+              ? (itemActief(item) ? 'bg-amber-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')
+              : (itemActief(item) ? 'text-white' : 'text-gray-300 hover:text-white hover:bg-gray-800')
             return (
               <div key={item.label} className="pt-1">
-                <Link href={kindHref(kinderen[0])} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${itemActief(item) ? 'text-white' : 'text-gray-300 hover:text-white hover:bg-gray-800'}`}>
+                <Link href={parentHref} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${parentCls}`}>
                   <span className="text-base">{item.icon}</span>
                   {item.label}
                 </Link>
