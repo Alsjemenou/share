@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { formatBytes } from '@/lib/format'
 
 const CHUNK = 8 * 1024 * 1024 // 8 MB per stuk
@@ -13,6 +13,12 @@ type Taak = {
   fout?: string
 }
 
+export type UploaderHandle = {
+  kiesBestanden: () => void
+  kiesMap: () => void
+  voegToe: (files: FileList | File[]) => void
+}
+
 async function postChunk(uploadId: string, offset: number, blob: Blob): Promise<{ ok: boolean; ontvangen?: number; status: number }> {
   const r = await fetch(`/api/upload/chunk?id=${encodeURIComponent(uploadId)}&offset=${offset}`, {
     method: 'POST',
@@ -24,7 +30,9 @@ async function postChunk(uploadId: string, offset: number, blob: Blob): Promise<
   return { ok: r.ok, ontvangen: d.ontvangen, status: r.status }
 }
 
-export default function Uploader({ onKlaar, mapId = null, compact = false }: { onKlaar: () => void; mapId?: number | null; compact?: boolean }) {
+type Props = { onKlaar: () => void; mapId?: number | null; compact?: boolean; toonZone?: boolean }
+
+const Uploader = forwardRef<UploaderHandle, Props>(function Uploader({ onKlaar, mapId = null, compact = false, toonZone = true }, ref) {
   const [taken, setTaken] = useState<Taak[]>([])
   const [sleep, setSleep] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,7 +87,6 @@ export default function Uploader({ onKlaar, mapId = null, compact = false }: { o
     }
   }, [onKlaar, update])
 
-  // Losse bestanden → in de huidige map.
   const voegToe = useCallback(async (files: FileList | File[]) => {
     const lijst = Array.from(files)
     const nieuw: Taak[] = lijst.map(f => ({
@@ -90,7 +97,6 @@ export default function Uploader({ onKlaar, mapId = null, compact = false }: { o
     for (let i = 0; i < lijst.length; i++) await uploadEen(nieuw[i].id, lijst[i], mapId)
   }, [uploadEen, mapId])
 
-  // Hele map (incl. submappen) → maak de mapstructuur na, upload elk bestand erin.
   const voegMapToe = useCallback(async (files: FileList) => {
     const lijst = Array.from(files)
     if (lijst.length === 0) return
@@ -100,7 +106,6 @@ export default function Uploader({ onKlaar, mapId = null, compact = false }: { o
     })
     setTaken(prev => [...nieuw, ...prev])
 
-    // Cache van mappad → aangemaakte map-id. Maakt ontbrekende mappen aan.
     const dirCache = new Map<string, number | null>()
     async function ensureDir(segs: string[]): Promise<number | null> {
       let key = ''
@@ -128,39 +133,48 @@ export default function Uploader({ onKlaar, mapId = null, compact = false }: { o
     onKlaar()
   }, [uploadEen, mapId, onKlaar])
 
+  useImperativeHandle(ref, () => ({
+    kiesBestanden: () => inputRef.current?.click(),
+    kiesMap: () => mapInputRef.current?.click(),
+    voegToe,
+  }), [voegToe])
+
   return (
     <div>
-      <div
-        onDragOver={e => { e.preventDefault(); setSleep(true) }}
-        onDragLeave={() => setSleep(false)}
-        onDrop={e => { e.preventDefault(); setSleep(false); if (e.dataTransfer.files.length) voegToe(e.dataTransfer.files) }}
-        onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-xl border-2 border-dashed text-center transition-colors ${compact ? 'p-4' : 'p-8'} ${
-          sleep ? 'border-amber-500 bg-amber-500/10' : 'border-gray-700 hover:border-gray-600 bg-gray-900'
-        }`}
-      >
-        {compact ? (
-          <div className="flex items-center justify-center gap-x-3 gap-y-1 flex-wrap text-sm">
-            <span className="text-lg">⬆️</span>
-            <span className="font-medium">Sleep bestanden hierheen of klik om te kiezen</span>
-            <button onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1 font-medium">📁 Map uploaden</button>
-          </div>
-        ) : (
-          <>
-            <div className="text-4xl mb-2">⬆️</div>
-            <div className="font-medium">Sleep bestanden hierheen of klik om te kiezen</div>
-            <div className="text-xs text-gray-500 mt-1">Grote bestanden worden in stukken geüpload en kunnen hervatten.</div>
-            <div className="mt-3">
-              <button onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">📁 Map uploaden (incl. submappen)</button>
+      {toonZone && (
+        <div
+          onDragOver={e => { e.preventDefault(); setSleep(true) }}
+          onDragLeave={() => setSleep(false)}
+          onDrop={e => { e.preventDefault(); setSleep(false); if (e.dataTransfer.files.length) voegToe(e.dataTransfer.files) }}
+          onClick={() => inputRef.current?.click()}
+          className={`cursor-pointer rounded-xl border-2 border-dashed text-center transition-colors ${compact ? 'p-4' : 'p-8'} ${
+            sleep ? 'border-amber-500 bg-amber-500/10' : 'border-gray-700 hover:border-gray-600 bg-gray-900'
+          }`}
+        >
+          {compact ? (
+            <div className="flex items-center justify-center gap-x-3 gap-y-1 flex-wrap text-sm">
+              <span className="text-lg">⬆️</span>
+              <span className="font-medium">Sleep bestanden hierheen of klik om te kiezen</span>
+              <button onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1 font-medium">📁 Map uploaden</button>
             </div>
-          </>
-        )}
-        <input ref={inputRef} type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) voegToe(e.target.files); e.target.value = '' }} />
-        <input ref={mapInputRef} type="file" className="hidden" onChange={e => { if (e.target.files?.length) voegMapToe(e.target.files); e.target.value = '' }} />
-      </div>
+          ) : (
+            <>
+              <div className="text-4xl mb-2">⬆️</div>
+              <div className="font-medium">Sleep bestanden hierheen of klik om te kiezen</div>
+              <div className="text-xs text-gray-500 mt-1">Grote bestanden worden in stukken geüpload en kunnen hervatten.</div>
+              <div className="mt-3">
+                <button onClick={e => { e.stopPropagation(); mapInputRef.current?.click() }} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">📁 Map uploaden (incl. submappen)</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <input ref={inputRef} type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) voegToe(e.target.files); e.target.value = '' }} />
+      <input ref={mapInputRef} type="file" className="hidden" onChange={e => { if (e.target.files?.length) voegMapToe(e.target.files); e.target.value = '' }} />
 
       {taken.length > 0 && (
-        <div className="mt-4 space-y-2 max-h-72 overflow-y-auto">
+        <div className="mt-3 space-y-2 max-h-72 overflow-y-auto">
           {taken.map(t => {
             const pct = t.grootte > 0 ? Math.round((t.verzonden / t.grootte) * 100) : (t.status === 'klaar' ? 100 : 0)
             return (
@@ -188,4 +202,6 @@ export default function Uploader({ onKlaar, mapId = null, compact = false }: { o
       )}
     </div>
   )
-}
+})
+
+export default Uploader

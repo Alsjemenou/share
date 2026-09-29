@@ -65,7 +65,7 @@ function AlleBestanden() {
         </div>
       )}
       {bestanden.map(b => (
-        <div key={b.id} className={`bg-gray-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectie.has(b.id) ? 'border-amber-500/60' : 'border-gray-800'}`}>
+        <div key={b.id} className={`bg-gray-900 border rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2 ${selectie.has(b.id) ? 'border-amber-500/60' : 'border-gray-800'}`}>
           <input type="checkbox" checked={selectie.has(b.id)} onChange={() => toggleSel(b.id)} className="shrink-0" />
           <span className="text-2xl shrink-0">{bestandIcoon(b.mime, b.originele_naam)}</span>
           <div className="min-w-0 flex-1">
@@ -76,7 +76,7 @@ function AlleBestanden() {
               {b.downloads > 0 && <span>⬇️ {b.downloads}</span>}
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
             <button onClick={() => setDeel(b)} className="text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-1.5 font-medium">Delen</button>
             <button onClick={() => setVerplaats([b])} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Verplaats</button>
             <a href={`/api/bestand/${b.id}/download`} className="text-xs bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 font-medium">Download</a>
