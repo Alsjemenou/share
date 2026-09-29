@@ -29,7 +29,7 @@ export default function BeheerPage() {
 }
 
 // ── Alle bestanden ────────────────────────────────────────────────────────────
-type Bestand = { id: number; originele_naam: string; mime: string; grootte: number; created_at: string; eigenaar_id: number; eigenaar_naam: string; aantal_links: number; aantal_accounts: number; downloads: number }
+type Bestand = { id: number; originele_naam: string; mime: string; grootte: number; created_at: string; eigenaar_id: number; eigenaar_naam: string; map_id: number | null; map_pad: string | null; aantal_links: number; aantal_accounts: number; downloads: number }
 function AlleBestanden() {
   const [bestanden, setBestanden] = useState<Bestand[]>([])
   const [laden, setLaden] = useState(true)
@@ -77,7 +77,9 @@ function AlleBestanden() {
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium text-sm">{b.originele_naam}</div>
             <div className="text-xs text-gray-500 flex flex-wrap gap-x-3">
-              <span>👤 {b.eigenaar_naam}</span><span>{formatBytes(b.grootte)}</span><span>{formatDatumKort(b.created_at)}</span>
+              <span className="text-gray-300">👤 {b.eigenaar_naam}</span>
+              <span className="text-amber-400/90">📁 {b.map_pad || 'hoofdmap'}</span>
+              <span>{formatBytes(b.grootte)}</span><span>{formatDatumKort(b.created_at)}</span>
               {b.aantal_links > 0 && <span>🔗 {b.aantal_links}</span>}
               {b.downloads > 0 && <span>⬇️ {b.downloads}</span>}
             </div>

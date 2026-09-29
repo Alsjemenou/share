@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   const rijen = db.prepare(`
     SELECT b.id, b.originele_naam, b.mime, b.grootte, b.created_at,
-           b.eigenaar_id, e.weergavenaam AS eigenaar_naam,
+           b.eigenaar_id, b.map_id, e.weergavenaam AS eigenaar_naam,
            (SELECT COUNT(*) FROM deel_link dl WHERE dl.bestand_id = b.id AND dl.actief = 1) AS aantal_links,
            (SELECT COUNT(*) FROM deel_account da WHERE da.bestand_id = b.id) AS aantal_accounts,
            (SELECT COUNT(*) FROM download_log lg WHERE lg.bestand_id = b.id) AS downloads
@@ -25,9 +25,22 @@ export async function GET(req: NextRequest) {
     JOIN gebruiker e ON e.id = b.eigenaar_id
     ${alle ? '' : 'WHERE b.eigenaar_id = @uid'}
     ORDER BY b.created_at DESC
-  `).all(alle ? {} : { uid: g.id })
+  `).all(alle ? {} : { uid: g.id }) as { map_id: number | null; [k: string]: unknown }[]
 
-  return NextResponse.json({ bestanden: rijen, alle })
+  // Volledig mappad per bestand (bijv. "Project X / Sub"), of null voor de hoofdmap.
+  const mapRijen = db.prepare('SELECT id, naam, ouder_id FROM map').all() as { id: number; naam: string; ouder_id: number | null }[]
+  const opId = new Map(mapRijen.map(m => [m.id, m]))
+  const padVan = (mapId: number | null): string | null => {
+    if (mapId == null) return null
+    const delen: string[] = []
+    let cur: number | null = mapId
+    const zie = new Set<number>()
+    while (cur != null && !zie.has(cur)) { zie.add(cur); const m = opId.get(cur); if (!m) break; delen.unshift(m.naam); cur = m.ouder_id }
+    return delen.join(' / ')
+  }
+  const bestanden = rijen.map(r => ({ ...r, map_pad: padVan(r.map_id) }))
+
+  return NextResponse.json({ bestanden, alle })
 }
 
 // Bestand(en) verplaatsen naar een (andere) map. map_id = null → hoofdmap.
