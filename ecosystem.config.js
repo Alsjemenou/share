@@ -27,6 +27,9 @@ module.exports = {
       env: {
         PORT: '3005',
         NODE_ENV: 'production',
+        // --openssl-legacy-provider is nodig voor de SMB-backup: @marsaud/smb2 gebruikt
+        // via de 'ntlm'-library DES/MD4, die OpenSSL 3 (Node 20) standaard blokkeert.
+        NODE_OPTIONS: '--openssl-legacy-provider',
         ...extra,
       },
       max_memory_restart: '500M',
