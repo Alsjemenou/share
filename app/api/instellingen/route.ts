@@ -10,7 +10,7 @@ const GEHEIM = new Set(['mail_gmail_wachtwoord', 'mail_smtp_wachtwoord'])
 const GEMASKEERD = '__SET__'
 // Welke sleutels deze route beheert (de SMB-backupconfig loopt via /api/backup/smb).
 const TOEGESTAAN = new Set([
-  'mail_enabled', 'mail_methode', 'mail_afzender',
+  'mail_enabled', 'mail_methode', 'mail_afzender', 'mail_notify_download',
   'mail_gmail_user', 'mail_gmail_wachtwoord',
   'mail_smtp_host', 'mail_smtp_port', 'mail_smtp_secure', 'mail_smtp_user', 'mail_smtp_wachtwoord', 'mail_smtp_from',
 ])

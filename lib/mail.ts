@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { leesInstelling } from '@/lib/instellingen'
+import { getDb } from '@/lib/db'
 
 // E-mailnotificaties via Gmail SMTP (app-wachtwoord), net als de zusje-apps.
 // Credentials komen uit de instellingen (Beheer → E-mail) met terugval op de
@@ -117,6 +118,32 @@ export async function mailUitnodiging(naar: string, delerNaam: string, wat: stri
   try {
     await verstuurMail(c, naar, `${delerNaam} heeft bestanden met je gedeeld — activeer je account`, omhulsel(c.afzender, inhoud))
     return { ok: true, naar }
+  } catch (e) { return { ok: false, error: String(e) } }
+}
+
+// Melding aan de eigenaar dat een van z'n gedeelde bestanden is gedownload.
+// Gated op mail_enabled én mail_notify_download; eigenaar moet een e-mailadres hebben.
+export async function mailDownloadMelding(bestandId: number, downloader: string): Promise<MailResultaat> {
+  const c = haalMailConfig()
+  if (!c.enabled) return { ok: false, overgeslagen: 'e-mail staat uit' }
+  if (leesInstelling('mail_notify_download', '1') !== '1') return { ok: false, overgeslagen: 'downloadmeldingen uit' }
+  if (!mailGeconfigureerd(c)) return { ok: false, error: 'E-mail niet geconfigureerd' }
+  const db = getDb()
+  const b = db.prepare(`
+    SELECT b.originele_naam, u.email AS eig_email, u.weergavenaam AS eig_naam
+    FROM bestand b JOIN gebruiker u ON u.id = b.eigenaar_id WHERE b.id = ?
+  `).get(bestandId) as { originele_naam: string; eig_email: string | null; eig_naam: string } | undefined
+  if (!b) return { ok: false, overgeslagen: 'bestand niet gevonden' }
+  if (!b.eig_email) return { ok: false, overgeslagen: 'eigenaar heeft geen e-mailadres' }
+  const totaal = (db.prepare('SELECT COUNT(*) n FROM download_log WHERE bestand_id = ?').get(bestandId) as { n: number }).n
+  const wanneer = new Date().toLocaleString('nl-NL', { dateStyle: 'full', timeStyle: 'short' })
+  const inhoud = `<p>Hoi ${escapeHtml(b.eig_naam)},</p>
+    <p>Je gedeelde bestand <b>${escapeHtml(b.originele_naam)}</b> is zojuist gedownload.</p>
+    <p style="color:#444">Door: <b>${escapeHtml(downloader)}</b><br>Wanneer: ${escapeHtml(wanneer)}<br>Totaal aantal downloads: <b>${totaal}</b></p>
+    ${knop(appUrl('/'), 'Bekijk in Deel')}`
+  try {
+    await verstuurMail(c, b.eig_email, `Gedownload: ${b.originele_naam}`, omhulsel(c.afzender, inhoud))
+    return { ok: true, naar: b.eig_email }
   } catch (e) { return { ok: false, error: String(e) } }
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import { getDb, BESTAND_DIR, opslagBeschikbaar } from '@/lib/db'
 import { linkOngeldigReden, leesGrant, type DeelLink } from '@/lib/deel'
+import { mailDownloadMelding } from '@/lib/mail'
 import { serveerBestand } from '@/lib/bestandStream'
 
 export const runtime = 'nodejs'
@@ -39,10 +40,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   // Downloads tellen/loggen we alleen bij een echte download (niet bij preview-streaming),
   // en alleen op de eerste (niet-Range) aanvraag.
   if (!preview && !req.headers.get('range')) {
+    const ip = req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for') || null
     db.prepare('UPDATE deel_link SET download_count = download_count + 1 WHERE id = ?').run(link.id)
     db.prepare('INSERT INTO download_log (bestand_id, deel_link_id, ip) VALUES (?, ?, ?)').run(
-      link.bestand_id, link.id, req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for') || null,
+      link.bestand_id, link.id, ip,
     )
+    // Eigenaar mailen bij een download via de publieke link. Niet blokkerend.
+    void mailDownloadMelding(link.bestand_id, `publieke link${ip ? ` · IP ${ip}` : ''}`).catch(() => {})
   }
 
   // Preview → inline streamen (in de speler); download → als bijlage.

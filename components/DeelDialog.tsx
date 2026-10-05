@@ -353,9 +353,28 @@ function DownloadsTab({ bestandId }: { bestandId: number }) {
   const [laden, setLaden] = useState(true)
   useEffect(() => { (async () => { const r = await fetch(`/api/bestand/${bestandId}/downloads`); if (r.ok) { const d = await r.json(); setLogs(d.logs); setTotaal(d.totaal) } setLaden(false) })() }, [bestandId])
   if (laden) return <div className="text-sm text-gray-500 text-center py-4">Laden…</div>
+
+  // Samenvatting "hoe vaak per downloader".
+  const perDownloader = new Map<string, number>()
+  for (const l of logs) {
+    const sleutel = l.gebruiker_naam ? `👤 ${l.gebruiker_naam}` : `🔗 publieke link${l.ip ? ` · ${l.ip}` : ''}`
+    perDownloader.set(sleutel, (perDownloader.get(sleutel) || 0) + 1)
+  }
+  const samenvatting = [...perDownloader.entries()].sort((a, b) => b[1] - a[1])
+
   return (
     <div>
       <div className="text-sm mb-3">Totaal <b>{totaal}</b> download{totaal === 1 ? '' : 's'}.</div>
+      {samenvatting.length > 0 && (
+        <div className="mb-3 space-y-1">
+          <div className="text-xs text-gray-400">Per downloader:</div>
+          {samenvatting.map(([naam, n]) => (
+            <div key={naam} className="flex items-center justify-between text-xs bg-gray-800/60 rounded-lg px-3 py-1.5">
+              <span className="truncate">{naam}</span><span className="text-gray-400 shrink-0">{n}×</span>
+            </div>
+          ))}
+        </div>
+      )}
       {logs.length === 0 ? <div className="text-sm text-gray-500 text-center py-2">Nog geen downloads.</div> : (
         <div className="space-y-1">
           {logs.map((l, i) => (

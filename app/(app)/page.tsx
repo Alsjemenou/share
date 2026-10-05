@@ -21,7 +21,7 @@ export default function MijnBestandenPage() {
   const [mappen, setMappen] = useState<Map[]>([])
   const [bestanden, setBestanden] = useState<Bestand[]>([])
   const [laden, setLaden] = useState(true)
-  const [deel, setDeel] = useState<(DeelDoel & { tab?: 'delen' | 'link' }) | null>(null)
+  const [deel, setDeel] = useState<(DeelDoel & { tab?: 'delen' | 'link' | 'downloads' }) | null>(null)
   const [verplaats, setVerplaats] = useState<Bestand[] | null>(null)
   const [selectie, setSelectie] = useState<Set<number>>(new Set())
   const [sleepActief, setSleepActief] = useState(false)
@@ -179,7 +179,9 @@ export default function MijnBestandenPage() {
                     {b.aantal_links > 0 && <span>🔗 {b.aantal_links}</span>}
                     {b.aantal_accounts > 0 && <span>👤 {b.aantal_accounts}</span>}
                     {b.aantal_groepen > 0 && <span>👥 {b.aantal_groepen}</span>}
-                    {b.downloads > 0 && <span>⬇️ {b.downloads}</span>}
+                    {(b.eigenaar_id === gebruiker?.id || gebruiker?.is_admin)
+                      ? <button onClick={() => setDeel({ soort: 'bestand', id: b.id, naam: b.originele_naam, mime: b.mime, tab: 'downloads' })} className="text-amber-400/90 hover:text-amber-300 underline" title="Downloadhistorie: wie, wanneer, hoe vaak">⬇️ {b.downloads} · historie</button>
+                      : (b.downloads > 0 && <span>⬇️ {b.downloads}</span>)}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">

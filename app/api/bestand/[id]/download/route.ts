@@ -3,6 +3,7 @@ import path from 'path'
 import { getDb, BESTAND_DIR, opslagBeschikbaar } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 import { magBestandZien } from '@/lib/deel'
+import { mailDownloadMelding } from '@/lib/mail'
 import { serveerBestand } from '@/lib/bestandStream'
 
 export const runtime = 'nodejs'
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     db.prepare('INSERT INTO download_log (bestand_id, gebruiker_id, ip) VALUES (?, ?, ?)').run(
       b.id, g.id, req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for') || null,
     )
+    // Eigenaar mailen (niet als je je eigen bestand downloadt). Niet blokkerend.
+    if (g.id !== b.eigenaar_id) void mailDownloadMelding(b.id, g.weergavenaam).catch(() => {})
   }
 
   return serveerBestand(req, absPad, { mime: b.mime, naam: b.originele_naam, alsBijlage: true })

@@ -196,13 +196,13 @@ function Personen() {
 // ── E-mail ──────────────────────────────────────────────────────────────────────
 const invoer = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm w-full'
 type MailCfg = {
-  mail_enabled: string; mail_methode: string; mail_afzender: string
+  mail_enabled: string; mail_methode: string; mail_afzender: string; mail_notify_download: string
   mail_gmail_user: string; mail_gmail_wachtwoord: string
   mail_smtp_host: string; mail_smtp_port: string; mail_smtp_secure: string
   mail_smtp_user: string; mail_smtp_wachtwoord: string; mail_smtp_from: string
 }
 const LEEG_MAIL: MailCfg = {
-  mail_enabled: '0', mail_methode: 'smtp', mail_afzender: 'Deel',
+  mail_enabled: '0', mail_methode: 'smtp', mail_afzender: 'Deel', mail_notify_download: '1',
   mail_gmail_user: '', mail_gmail_wachtwoord: '',
   mail_smtp_host: '', mail_smtp_port: '465', mail_smtp_secure: '1',
   mail_smtp_user: '', mail_smtp_wachtwoord: '', mail_smtp_from: '',
@@ -223,6 +223,7 @@ function EmailBeheer() {
     setBezig(true); setMelding(null)
     const body: Record<string, string> = {
       mail_enabled: cfg.mail_enabled, mail_methode: cfg.mail_methode, mail_afzender: cfg.mail_afzender,
+      mail_notify_download: cfg.mail_notify_download,
       mail_gmail_user: cfg.mail_gmail_user,
       mail_smtp_host: cfg.mail_smtp_host, mail_smtp_port: cfg.mail_smtp_port, mail_smtp_secure: cfg.mail_smtp_secure,
       mail_smtp_user: cfg.mail_smtp_user, mail_smtp_from: cfg.mail_smtp_from,
@@ -253,6 +254,10 @@ function EmailBeheer() {
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={cfg.mail_enabled === '1'} onChange={e => set({ mail_enabled: e.target.checked ? '1' : '0' })} />
         E-mailnotificaties aanzetten
+      </label>
+      <label className="flex items-center gap-2 text-sm text-gray-400">
+        <input type="checkbox" checked={cfg.mail_notify_download === '1'} onChange={e => set({ mail_notify_download: e.target.checked ? '1' : '0' })} />
+        Mail de eigenaar bij elke download van een gedeeld bestand
       </label>
 
       <div className="flex gap-2">
