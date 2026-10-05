@@ -48,10 +48,23 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const { fout } = await vereisAdmin()
   if (fout) return fout
-  const { id, weergavenaam, is_admin, mag_branding, nieuw_wachtwoord } = await req.json()
+  const { id, weergavenaam, email, is_admin, mag_branding, nieuw_wachtwoord } = await req.json()
   const db = getDb()
   if (weergavenaam !== undefined) {
     db.prepare('UPDATE gebruiker SET weergavenaam = ? WHERE id = ?').run(String(weergavenaam).trim(), id)
+  }
+  if (email !== undefined) {
+    const schoon = String(email || '').trim()
+    if (schoon) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(schoon)) {
+        return NextResponse.json({ error: 'Ongeldig e-mailadres' }, { status: 400 })
+      }
+      const bezet = db.prepare('SELECT 1 FROM gebruiker WHERE email = ? COLLATE NOCASE AND id != ?').get(schoon, id)
+      if (bezet) return NextResponse.json({ error: 'Dat e-mailadres is al in gebruik' }, { status: 400 })
+      db.prepare('UPDATE gebruiker SET email = ? WHERE id = ?').run(schoon, id)
+    } else {
+      db.prepare('UPDATE gebruiker SET email = NULL WHERE id = ?').run(id)
+    }
   }
   if (is_admin !== undefined) {
     db.prepare('UPDATE gebruiker SET is_admin = ? WHERE id = ?').run(is_admin ? 1 : 0, id)

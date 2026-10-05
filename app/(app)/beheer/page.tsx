@@ -130,6 +130,12 @@ function Personen() {
     const r = await fetch('/api/gebruikers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, nieuw_wachtwoord: ww }) })
     if (!r.ok) alert((await r.json()).error || 'Mislukt'); else laad()
   }
+  async function wijzigEmail(p: Persoon) {
+    const email = prompt(`E-mailadres voor ${p.weergavenaam} (leeg laten = verwijderen):`, p.email || '')
+    if (email === null) return
+    const r = await fetch('/api/gebruikers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, email }) })
+    if (!r.ok) alert((await r.json()).error || 'Mislukt'); else laad()
+  }
   async function toggleAdmin(p: Persoon) {
     await fetch('/api/gebruikers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, is_admin: p.is_admin ? 0 : 1 }) })
     laad()
@@ -174,6 +180,7 @@ function Personen() {
               <div className="text-xs text-gray-500">{p.email || '—'} · {p.aantal_bestanden} bestand{p.aantal_bestanden === 1 ? '' : 'en'}</div>
             </div>
             <div className="flex items-center gap-2 text-xs shrink-0">
+              <button onClick={() => wijzigEmail(p)} className="text-gray-400 hover:text-white underline">E-mail</button>
               <button onClick={() => reset(p)} className="text-gray-400 hover:text-white underline">Wachtwoord</button>
               <button onClick={() => toggleBranding(p)} className="text-gray-400 hover:text-white underline">{p.mag_branding ? 'Huisstijl uit' : 'Huisstijl aan'}</button>
               <button onClick={() => toggleAdmin(p)} className="text-gray-400 hover:text-white underline">{p.is_admin ? 'Geen beheer' : 'Beheer'}</button>
