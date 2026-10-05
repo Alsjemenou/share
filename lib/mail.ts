@@ -6,21 +6,46 @@ import { leesInstelling } from '@/lib/instellingen'
 // server-env (GMAIL_USER / GMAIL_APP_PASSWORD).
 // App-wachtwoord aanmaken: https://support.google.com/accounts/answer/185833
 
-export type MailConfig = { user: string; pass: string; afzender: string; enabled: boolean }
+// Een naar transport vertaalde mailconfig. `methode` kiest tussen een eigen
+// SMTP-server en Gmail (app-wachtwoord); beide monden uit in host/port/secure/auth.
+export type MailConfig = {
+  enabled: boolean
+  methode: 'smtp' | 'gmail'
+  afzender: string   // weergavenaam voor het From-veld
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  pass: string
+  from: string       // From-adres
+}
 export type MailResultaat = { ok: boolean; overgeslagen?: string; error?: string; naar?: string }
 
 export function haalMailConfig(): MailConfig {
-  return {
-    user: (leesInstelling('mail_gmail_user') || process.env.GMAIL_USER || '').trim(),
+  const afzender = leesInstelling('mail_afzender') || 'Deel'
+  const enabled = leesInstelling('mail_enabled', '0') === '1'
+  const methode = leesInstelling('mail_methode', 'smtp') === 'gmail' ? 'gmail' : 'smtp'
+
+  if (methode === 'gmail') {
+    const user = (leesInstelling('mail_gmail_user') || process.env.GMAIL_USER || '').trim()
     // Google toont het app-wachtwoord met spaties; die halen we eruit.
-    pass: (leesInstelling('mail_gmail_wachtwoord') || process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
-    afzender: leesInstelling('mail_afzender') || 'Deel',
-    enabled: leesInstelling('mail_enabled', '0') === '1',
+    const pass = (leesInstelling('mail_gmail_wachtwoord') || process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '')
+    return { enabled, methode, afzender, host: 'smtp.gmail.com', port: 465, secure: true, user, pass, from: user }
   }
+
+  // Eigen SMTP-server.
+  const host = (leesInstelling('mail_smtp_host') || process.env.SMTP_HOST || '').trim()
+  const port = Number(leesInstelling('mail_smtp_port') || process.env.SMTP_PORT) || 587
+  const secureRaw = leesInstelling('mail_smtp_secure') || String(process.env.SMTP_SECURE || '')
+  const secure = secureRaw === '1' || secureRaw.toLowerCase() === 'true' || port === 465
+  const user = (leesInstelling('mail_smtp_user') || process.env.SMTP_USER || '').trim()
+  const pass = leesInstelling('mail_smtp_wachtwoord') || process.env.SMTP_PASS || ''
+  const from = (leesInstelling('mail_smtp_from') || user).trim()
+  return { enabled, methode, afzender, host, port, secure, user, pass, from }
 }
 
 export function mailGeconfigureerd(c: MailConfig): boolean {
-  return !!(c.user && c.pass)
+  return !!(c.host && c.from && c.pass)
 }
 
 // Basis-URL voor links in e-mails. Zet SHARE_PUBLIC_URL in de server-env
@@ -32,14 +57,14 @@ export function appUrl(pad = ''): string {
 }
 
 export async function verstuurMail(c: MailConfig, naar: string, onderwerp: string, html: string): Promise<void> {
-  if (!c.user || !c.pass) throw new Error('E-mail (Gmail) is niet ingesteld')
+  if (!c.host || !c.from) throw new Error('E-mail is niet ingesteld')
   const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: c.user, pass: c.pass },
+    host: c.host,
+    port: c.port,
+    secure: c.secure,
+    auth: (c.user || c.pass) ? { user: c.user, pass: c.pass } : undefined,
   })
-  await transporter.sendMail({ from: `${c.afzender} <${c.user}>`, to: naar, subject: onderwerp, html })
+  await transporter.sendMail({ from: `${c.afzender} <${c.from}>`, to: naar, subject: onderwerp, html })
 }
 
 // ── HTML-sjablonen ──────────────────────────────────────────────────────────────

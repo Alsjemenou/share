@@ -188,23 +188,44 @@ function Personen() {
 
 // ── E-mail ──────────────────────────────────────────────────────────────────────
 const invoer = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm w-full'
+type MailCfg = {
+  mail_enabled: string; mail_methode: string; mail_afzender: string
+  mail_gmail_user: string; mail_gmail_wachtwoord: string
+  mail_smtp_host: string; mail_smtp_port: string; mail_smtp_secure: string
+  mail_smtp_user: string; mail_smtp_wachtwoord: string; mail_smtp_from: string
+}
+const LEEG_MAIL: MailCfg = {
+  mail_enabled: '0', mail_methode: 'smtp', mail_afzender: 'Deel',
+  mail_gmail_user: '', mail_gmail_wachtwoord: '',
+  mail_smtp_host: '', mail_smtp_port: '465', mail_smtp_secure: '1',
+  mail_smtp_user: '', mail_smtp_wachtwoord: '', mail_smtp_from: '',
+}
 function EmailBeheer() {
-  const [cfg, setCfg] = useState({ mail_enabled: '0', mail_gmail_user: '', mail_gmail_wachtwoord: '', mail_afzender: 'Deel' })
+  const [cfg, setCfg] = useState<MailCfg>(LEEG_MAIL)
   const [testNaar, setTestNaar] = useState('')
   const [melding, setMelding] = useState<{ t: string; ok: boolean } | null>(null)
   const [bezig, setBezig] = useState(false)
+  const set = (v: Partial<MailCfg>) => setCfg(c => ({ ...c, ...v }))
+  const isGmail = cfg.mail_methode === 'gmail'
 
   useEffect(() => {
-    fetch('/api/instellingen').then(r => r.json()).then(d => setCfg(c => ({ ...c, ...d, mail_gmail_wachtwoord: d.mail_gmail_wachtwoord === '__SET__' ? '__SET__' : '' })))
+    fetch('/api/instellingen').then(r => r.json()).then(d => setCfg({ ...LEEG_MAIL, ...d }))
   }, [])
 
   async function opslaan() {
     setBezig(true); setMelding(null)
-    const body: Record<string, string> = { mail_enabled: cfg.mail_enabled, mail_gmail_user: cfg.mail_gmail_user, mail_afzender: cfg.mail_afzender }
+    const body: Record<string, string> = {
+      mail_enabled: cfg.mail_enabled, mail_methode: cfg.mail_methode, mail_afzender: cfg.mail_afzender,
+      mail_gmail_user: cfg.mail_gmail_user,
+      mail_smtp_host: cfg.mail_smtp_host, mail_smtp_port: cfg.mail_smtp_port, mail_smtp_secure: cfg.mail_smtp_secure,
+      mail_smtp_user: cfg.mail_smtp_user, mail_smtp_from: cfg.mail_smtp_from,
+    }
+    // Geheimen alleen meesturen als ze echt gewijzigd zijn (leeg/__SET__ = behouden).
     if (cfg.mail_gmail_wachtwoord && cfg.mail_gmail_wachtwoord !== '__SET__') body.mail_gmail_wachtwoord = cfg.mail_gmail_wachtwoord
+    if (cfg.mail_smtp_wachtwoord && cfg.mail_smtp_wachtwoord !== '__SET__') body.mail_smtp_wachtwoord = cfg.mail_smtp_wachtwoord
     const r = await fetch('/api/instellingen', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     setMelding(r.ok ? { t: 'Opgeslagen.', ok: true } : { t: 'Opslaan mislukte', ok: false })
-    if (r.ok && cfg.mail_gmail_wachtwoord) setCfg(c => ({ ...c, mail_gmail_wachtwoord: '__SET__' }))
+    if (r.ok) set({ mail_gmail_wachtwoord: cfg.mail_gmail_wachtwoord ? '__SET__' : '', mail_smtp_wachtwoord: cfg.mail_smtp_wachtwoord ? '__SET__' : cfg.mail_smtp_wachtwoord })
     setBezig(false)
   }
   async function testmail() {
@@ -214,24 +235,55 @@ function EmailBeheer() {
     setMelding(r.ok ? { t: `Testmail verstuurd naar ${d.naar}.`, ok: true } : { t: d.error || 'Versturen mislukte', ok: false })
     setBezig(false)
   }
+  const wwPlaceholder = (v: string, leeg: string) => v === '__SET__' ? '•••••••• (ingesteld — leeg laten = behouden)' : leeg
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4 max-w-lg">
       <div>
         <h2 className="font-semibold mb-1">E-mailnotificaties</h2>
-        <p className="text-sm text-gray-500">Via Gmail (SMTP) met een <b>app-wachtwoord</b>. Bij delen naar een account krijgt de ontvanger automatisch bericht; nieuwe accounts krijgen hun activatielink gemaild. <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noreferrer" className="text-amber-400 underline">App-wachtwoord aanmaken</a>.</p>
+        <p className="text-sm text-gray-500">Bij delen naar een account krijgt de ontvanger automatisch bericht; nieuwe accounts krijgen hun activatielink gemaild. Kies je eigen SMTP-server of Gmail.</p>
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={cfg.mail_enabled === '1'} onChange={e => setCfg({ ...cfg, mail_enabled: e.target.checked ? '1' : '0' })} />
+        <input type="checkbox" checked={cfg.mail_enabled === '1'} onChange={e => set({ mail_enabled: e.target.checked ? '1' : '0' })} />
         E-mailnotificaties aanzetten
       </label>
-      <div className="space-y-2">
-        <label className="block text-xs text-gray-400">Afzender-adres (Gmail)</label>
-        <input value={cfg.mail_gmail_user} onChange={e => setCfg({ ...cfg, mail_gmail_user: e.target.value })} placeholder="jij@gmail.com" className={invoer} autoComplete="off" />
-        <label className="block text-xs text-gray-400">App-wachtwoord</label>
-        <input type="password" value={cfg.mail_gmail_wachtwoord === '__SET__' ? '' : cfg.mail_gmail_wachtwoord} onChange={e => setCfg({ ...cfg, mail_gmail_wachtwoord: e.target.value })} placeholder={cfg.mail_gmail_wachtwoord === '__SET__' ? '•••••••• (ingesteld — leeg laten = behouden)' : '16-cijferig app-wachtwoord'} className={invoer} autoComplete="new-password" />
-        <label className="block text-xs text-gray-400">Afzendernaam</label>
-        <input value={cfg.mail_afzender} onChange={e => setCfg({ ...cfg, mail_afzender: e.target.value })} placeholder="Deel" className={invoer} />
+
+      <div className="flex gap-2">
+        {([['smtp', '📮 Eigen SMTP-server'], ['gmail', '✉️ Gmail (app-wachtwoord)']] as const).map(([id, label]) => (
+          <button key={id} onClick={() => set({ mail_methode: id })} className={`flex-1 text-sm px-3 py-2 rounded-lg font-medium ${cfg.mail_methode === id ? 'bg-amber-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>{label}</button>
+        ))}
+      </div>
+
+      {!isGmail ? (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2"><label className="block text-xs text-gray-400 mb-1">SMTP-server</label><input value={cfg.mail_smtp_host} onChange={e => set({ mail_smtp_host: e.target.value })} placeholder="smtp.mijndomein.nl" className={invoer} autoComplete="off" /></div>
+            <div><label className="block text-xs text-gray-400 mb-1">Poort</label><input value={cfg.mail_smtp_port} onChange={e => set({ mail_smtp_port: e.target.value.replace(/[^0-9]/g, '') })} inputMode="numeric" placeholder="465" className={invoer} /></div>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-400">
+            <input type="checkbox" checked={cfg.mail_smtp_secure === '1'} onChange={e => set({ mail_smtp_secure: e.target.checked ? '1' : '0' })} />
+            SSL/TLS (aan voor poort 465, uit = STARTTLS op 587)
+          </label>
+          <label className="block text-xs text-gray-400">Gebruikersnaam</label>
+          <input value={cfg.mail_smtp_user} onChange={e => set({ mail_smtp_user: e.target.value })} placeholder="webadmin@voorbeeld.nl" className={invoer} autoComplete="off" />
+          <label className="block text-xs text-gray-400">Wachtwoord</label>
+          <input type="password" value={cfg.mail_smtp_wachtwoord === '__SET__' ? '' : cfg.mail_smtp_wachtwoord} onChange={e => set({ mail_smtp_wachtwoord: e.target.value })} placeholder={wwPlaceholder(cfg.mail_smtp_wachtwoord, 'SMTP-wachtwoord')} className={invoer} autoComplete="new-password" />
+          <label className="block text-xs text-gray-400">Afzender-adres (From)</label>
+          <input value={cfg.mail_smtp_from} onChange={e => set({ mail_smtp_from: e.target.value })} placeholder="leeg = gebruikersnaam" className={invoer} autoComplete="off" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500"><a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noreferrer" className="text-amber-400 underline">App-wachtwoord aanmaken</a> (geen gewoon Gmail-wachtwoord).</p>
+          <label className="block text-xs text-gray-400">Afzender-adres (Gmail)</label>
+          <input value={cfg.mail_gmail_user} onChange={e => set({ mail_gmail_user: e.target.value })} placeholder="jij@gmail.com" className={invoer} autoComplete="off" />
+          <label className="block text-xs text-gray-400">App-wachtwoord</label>
+          <input type="password" value={cfg.mail_gmail_wachtwoord === '__SET__' ? '' : cfg.mail_gmail_wachtwoord} onChange={e => set({ mail_gmail_wachtwoord: e.target.value })} placeholder={wwPlaceholder(cfg.mail_gmail_wachtwoord, '16-cijferig app-wachtwoord')} className={invoer} autoComplete="new-password" />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Afzendernaam (weergave)</label>
+        <input value={cfg.mail_afzender} onChange={e => set({ mail_afzender: e.target.value })} placeholder="Deel" className={invoer} />
       </div>
       <button onClick={opslaan} disabled={bezig} className="bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2 text-sm disabled:opacity-50">Opslaan</button>
 
