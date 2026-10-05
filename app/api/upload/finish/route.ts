@@ -2,17 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { getDb, BESTAND_DIR } from '@/lib/db'
+import { getDb, BESTAND_DIR, opslagBeschikbaar } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 import { magMapUploaden } from '@/lib/deel'
 
 export const runtime = 'nodejs'
+
+const OPSLAG_OFFLINE = { error: 'Bestandsopslag is tijdelijk niet beschikbaar (netwerkschijf niet gekoppeld). Probeer het later opnieuw.' }
 
 // Rondt een upload af: valideert de grootte, verplaatst het .part-bestand naar
 // de privémap van de eigenaar en legt het bestand vast in de database.
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!opslagBeschikbaar()) return NextResponse.json(OPSLAG_OFFLINE, { status: 503 })
 
   const id = req.nextUrl.searchParams.get('id')
   const db = getDb()

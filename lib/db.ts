@@ -25,11 +25,32 @@ const UPLOAD_TMP_DIR = process.env.SHARE_UPLOAD_TMP_DIR
 // Huisstijl-logo's (klein) — bewust LOKAAL, altijd beschikbaar, buiten public/.
 const MERK_DIR = path.join(DB_DIR, 'merk')
 
+// Staat de bestandsopslag op een externe mount (SMB/CIFS)? Dan bewaken we met een
+// markerbestand of die mount echt actief is — zie opslagBeschikbaar().
+const OPSLAG_EXTERN = !!process.env.SHARE_BESTAND_DIR
+// Dit markerbestand hoort ALLEEN op de netwerkschijf te staan. Valt de mount weg,
+// dan is de lokale mountpoint-map leeg en ontbreekt de marker → opslag 'offline'.
+const OPSLAG_MARKER = path.join(BESTAND_DIR, '.opslag-ok')
+
+// Is de bestandsopslag daadwerkelijk beschikbaar? Bij een weggevallen netwerkschijf
+// zou de app anders STIL naar een lege lokale map schrijven (uploads raken dan zoek
+// zodra de mount terugkomt) en lijken bestaande bestanden 'verdwenen'. Met deze guard
+// weigeren upload/download-routes netjes i.p.v. ongemerkt lokaal weg te schrijven.
+// Bij lokale dev-opslag (geen SHARE_BESTAND_DIR) is er geen mount → altijd true.
+export function opslagBeschikbaar(): boolean {
+  if (!OPSLAG_EXTERN) return true
+  try { return fs.existsSync(OPSLAG_MARKER) } catch { return false }
+}
+
 let _db: Database.Database | null = null
 
 export function getDb(): Database.Database {
   if (_db) return _db
-  for (const d of [DB_DIR, BESTAND_DIR, UPLOAD_TMP_DIR, MERK_DIR]) {
+  // Lokale mappen altijd aanmaken. De externe opslagmappen NIET auto-aanmaken: dat
+  // zou bij een weggevallen mount de lege lokale mountpoint-map (her)creëren en het
+  // probleem maskeren. Bij lokale dev-opslag maken we ze wel aan.
+  const aanTeMaken = OPSLAG_EXTERN ? [DB_DIR, MERK_DIR] : [DB_DIR, BESTAND_DIR, UPLOAD_TMP_DIR, MERK_DIR]
+  for (const d of aanTeMaken) {
     if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true })
   }
   _db = new Database(DB_PATH)

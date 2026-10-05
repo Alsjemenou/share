@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { getDb, UPLOAD_TMP_DIR } from '@/lib/db'
+import { getDb, UPLOAD_TMP_DIR, opslagBeschikbaar } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 import { magMapUploaden } from '@/lib/deel'
+
+const OPSLAG_OFFLINE = { error: 'Bestandsopslag is tijdelijk niet beschikbaar (netwerkschijf niet gekoppeld). Probeer het later opnieuw.' }
 
 export const runtime = 'nodejs'
 
@@ -23,6 +25,7 @@ function ruimOudeSessiesOp() {
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!opslagBeschikbaar()) return NextResponse.json(OPSLAG_OFFLINE, { status: 503 })
 
   ruimOudeSessiesOp()
 

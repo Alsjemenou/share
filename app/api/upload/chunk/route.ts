@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
-import { getDb } from '@/lib/db'
+import { getDb, opslagBeschikbaar } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 
 export const runtime = 'nodejs'
+
+const OPSLAG_OFFLINE = { error: 'Bestandsopslag is tijdelijk niet beschikbaar (netwerkschijf niet gekoppeld). Probeer het later opnieuw.' }
 
 // Ontvangt één stuk (rauwe binaire body) en voegt het toe aan het .part-bestand.
 // De client stuurt ?id=<upload_id>&offset=<bytepositie>. Bij mismatch geven we
@@ -11,6 +13,7 @@ export const runtime = 'nodejs'
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!opslagBeschikbaar()) return NextResponse.json(OPSLAG_OFFLINE, { status: 503 })
 
   const id = req.nextUrl.searchParams.get('id')
   const offset = Number(req.nextUrl.searchParams.get('offset'))

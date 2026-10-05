@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
-import { getDb, BESTAND_DIR } from '@/lib/db'
+import { getDb, BESTAND_DIR, opslagBeschikbaar } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 import { magBestandZien } from '@/lib/deel'
 import { serveerBestand } from '@/lib/bestandStream'
 
 export const runtime = 'nodejs'
 
+const OPSLAG_OFFLINE = { error: 'Bestandsopslag is tijdelijk niet beschikbaar (netwerkschijf niet gekoppeld). Probeer het later opnieuw.' }
+
 // Downloadt een bestand ALLEEN als je bent ingelogd én het van jou is, met jou
 // gedeeld is, of je beheerder bent. Zo werkt een geraden URL niet.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!opslagBeschikbaar()) return NextResponse.json(OPSLAG_OFFLINE, { status: 503 })
 
   const { id } = await params
   const db = getDb()

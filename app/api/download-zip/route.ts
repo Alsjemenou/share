@@ -3,11 +3,13 @@ import fs from 'fs'
 import path from 'path'
 import { Readable } from 'stream'
 import archiver from 'archiver'
-import { getDb, BESTAND_DIR } from '@/lib/db'
+import { getDb, BESTAND_DIR, opslagBeschikbaar } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd, type Gebruiker } from '@/lib/auth'
 import { magBestandZien, magMapZien } from '@/lib/deel'
 
 export const runtime = 'nodejs'
+
+const OPSLAG_OFFLINE = { error: 'Bestandsopslag is tijdelijk niet beschikbaar (netwerkschijf niet gekoppeld). Probeer het later opnieuw.' }
 
 type BestandRij = { id: number; eigenaar_id: number; opgeslagen_naam: string; originele_naam: string }
 
@@ -27,6 +29,7 @@ function bestandenInMap(mapId: number, prefix: string): { rij: BestandRij; pad: 
 export async function GET(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
+  if (!opslagBeschikbaar()) return NextResponse.json(OPSLAG_OFFLINE, { status: 503 })
 
   const db = getDb()
   let items: { rij: BestandRij; pad: string }[] = []

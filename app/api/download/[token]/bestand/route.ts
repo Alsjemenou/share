@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
-import { getDb, BESTAND_DIR } from '@/lib/db'
+import { getDb, BESTAND_DIR, opslagBeschikbaar } from '@/lib/db'
 import { linkOngeldigReden, leesGrant, type DeelLink } from '@/lib/deel'
 import { serveerBestand } from '@/lib/bestandStream'
 
 export const runtime = 'nodejs'
+
+const OPSLAG_OFFLINE = { error: 'Bestandsopslag is tijdelijk niet beschikbaar (netwerkschijf niet gekoppeld). Probeer het later opnieuw.' }
 
 // Streamt het bestand achter een publieke link. Vereist een geldige download-grant
 // (uit GET/POST op de link) zodat een linkwachtwoord nooit in de URL hoeft.
@@ -14,6 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   if (grantLid == null) {
     return NextResponse.json({ error: 'Download niet vrijgegeven. Open de link opnieuw.' }, { status: 403 })
   }
+  if (!opslagBeschikbaar()) return NextResponse.json(OPSLAG_OFFLINE, { status: 503 })
 
   const db = getDb()
   const link = db.prepare(`
