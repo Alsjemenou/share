@@ -150,21 +150,23 @@ export async function mailDownloadMelding(bestandId: number, downloader: string)
 // Publieke link naar één of meer adressen sturen (vanuit de deel-dialoog).
 export async function mailPubliekeLink(
   naar: string[], afzenderNaam: string, bestandNaam: string, url: string,
-  opties: { wachtwoord?: boolean; preview?: boolean; bericht?: string },
+  opties: { wachtwoord?: boolean; preview?: boolean; bericht?: string; map?: boolean },
 ): Promise<MailResultaat> {
   const c = haalMailConfig()
   if (!c.enabled) return { ok: false, overgeslagen: 'e-mail staat uit' }
   const ontvangers = naar.map(s => s.trim()).filter(Boolean)
   if (ontvangers.length === 0) return { ok: false, overgeslagen: 'geen ontvangers' }
   if (!mailGeconfigureerd(c)) return { ok: false, error: 'E-mail niet geconfigureerd' }
+  const soort = opties.map ? 'map' : 'bestand'
   const extra: string[] = []
+  if (opties.map) extra.push('Je kunt de hele map als één <b>zip</b> downloaden.')
   if (opties.preview) extra.push('Dit is een <b>alleen-beluisteren</b>-link (geen download).')
   if (opties.wachtwoord) extra.push('De link is beveiligd met een <b>wachtwoord</b> — dat stuurt de afzender je apart toe.')
   const bericht = opties.bericht ? `<p style="white-space:pre-wrap;border-left:3px solid #eee;padding-left:12px;color:#444">${escapeHtml(opties.bericht)}</p>` : ''
   const inhoud = `<p>Hoi,</p>
-    <p><b>${escapeHtml(afzenderNaam)}</b> deelt een bestand met je via Deel: <b>${escapeHtml(bestandNaam)}</b>.</p>
+    <p><b>${escapeHtml(afzenderNaam)}</b> deelt een ${soort} met je via Deel: <b>${escapeHtml(bestandNaam)}</b>.</p>
     ${bericht}
-    ${knop(url, opties.preview ? 'Beluisteren' : 'Bekijken / downloaden')}
+    ${knop(url, opties.map ? 'Map downloaden' : (opties.preview ? 'Beluisteren' : 'Bekijken / downloaden'))}
     ${extra.length ? `<p style="color:#666;font-size:13px">${extra.join('<br>')}</p>` : ''}`
   try {
     await verstuurMail(c, ontvangers.join(', '), `${afzenderNaam} deelt "${bestandNaam}" met je`, omhulsel(c.afzender, inhoud))

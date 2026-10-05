@@ -249,6 +249,20 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // ── Publieke map-downloadlink (hele map als zip, geen account nodig) ──────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS deel_map_link (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      map_id INTEGER NOT NULL REFERENCES map(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      download_count INTEGER NOT NULL DEFAULT 0,
+      actief INTEGER NOT NULL DEFAULT 1,
+      aangemaakt_door INTEGER REFERENCES gebruiker(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_deelmaplink_map ON deel_map_link(map_id);
+  `)
+
   // ── Instellingen (key/value) ──────────────────────────────────────────────────
   // Beheer-brede instellingen: SMTP/e-mail (mail_*) en de SMB-backupconfig
   // (smb_config als JSON). Geheimen worden nooit onversleuteld naar de client gestuurd.

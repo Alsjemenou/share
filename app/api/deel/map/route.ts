@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd } from '@/lib/auth'
 import { magMapBeheren, maakDeelToken } from '@/lib/deel'
+import { mailDeelMelding, mailUitnodiging, mailPubliekeLink, appUrl } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
@@ -33,10 +34,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { map_id, groep_id, ontvanger, mag_uploaden } = await req.json()
+  const { map_id, groep_id, ontvanger, mag_uploaden, uitnodigen, bericht } = await req.json()
   if (!magMapBeheren(g, Number(map_id))) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
   const db = getDb()
   const upload = mag_uploaden ? 1 : 0
+  const mapRij = db.prepare('SELECT naam FROM map WHERE id = ?').get(Number(map_id)) as { naam: string } | undefined
+  const mapNaam = mapRij?.naam || 'een map'
 
   // ── Met een groep ─────────────────────────────────────────────────────────
   if (groep_id != null) {
@@ -50,44 +53,58 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // ── Met een account (op naam/e-mail) ──────────────────────────────────────
+  // ── Met een account / per e-mail ──────────────────────────────────────────
   const invoer = String(ontvanger || '').trim()
   if (!invoer) return NextResponse.json({ error: 'Kies een groep of vul een naam/e-mail in' }, { status: 400 })
   const email = isEmail(invoer) ? invoer : null
 
-  let account = db.prepare(
-    'SELECT id, weergavenaam, email, status, invite_token FROM gebruiker WHERE email = ? OR gebruikersnaam = ?'
-  ).get(email, invoer) as
-    | { id: number; weergavenaam: string; email: string | null; status: string; invite_token: string | null }
-    | undefined
+  const account = db.prepare(
+    'SELECT id, weergavenaam, email, status FROM gebruiker WHERE email = ? COLLATE NOCASE OR gebruikersnaam = ?'
+  ).get(email, invoer) as { id: number; weergavenaam: string; email: string | null; status: string } | undefined
 
-  let nieuweUitnodiging = false
-  if (!account) {
-    let gebruikersnaam = email || invoer
+  // Bestaand account → map delen onder "Gedeeld met mij".
+  if (account) {
+    db.prepare(`
+      INSERT INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door, mag_uploaden) VALUES (?, 'account', ?, ?, ?)
+      ON CONFLICT(map_id, ontvanger_type, ontvanger_id) DO UPDATE SET mag_uploaden = excluded.mag_uploaden
+    `).run(Number(map_id), account.id, g.id, upload)
+    const mail = account.email ? await mailDeelMelding(account.email, g.weergavenaam, mapNaam) : undefined
+    return NextResponse.json({
+      ok: true, modus: 'account',
+      account: { id: account.id, weergavenaam: account.weergavenaam, email: account.email, status: account.status },
+      mail,
+    })
+  }
+
+  if (!email) {
+    return NextResponse.json({ error: 'Geen account met die naam. Vul een e-mailadres in — dan sturen we een downloadlink of een uitnodiging.' }, { status: 400 })
+  }
+
+  // JA: uitnodigen om een account aan te maken (invited account + map-deling + activatielink).
+  if (uitnodigen) {
+    let gebruikersnaam = email
     if (db.prepare('SELECT 1 FROM gebruiker WHERE gebruikersnaam = ?').get(gebruikersnaam)) {
       gebruikersnaam = `${gebruikersnaam}-${maakDeelToken(3)}`
     }
-    const token = maakDeelToken()
+    const inviteToken = maakDeelToken()
     const r = db.prepare(`
       INSERT INTO gebruiker (gebruikersnaam, weergavenaam, email, is_admin, status, invite_token)
       VALUES (?, ?, ?, 0, 'uitgenodigd', ?)
-    `).run(gebruikersnaam, invoer, email, token)
-    account = { id: Number(r.lastInsertRowid), weergavenaam: invoer, email, status: 'uitgenodigd', invite_token: token }
-    nieuweUitnodiging = true
+    `).run(gebruikersnaam, email, email, inviteToken)
+    db.prepare(`
+      INSERT INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door, mag_uploaden) VALUES (?, 'account', ?, ?, ?)
+      ON CONFLICT(map_id, ontvanger_type, ontvanger_id) DO UPDATE SET mag_uploaden = excluded.mag_uploaden
+    `).run(Number(map_id), Number(r.lastInsertRowid), g.id, upload)
+    const mail = await mailUitnodiging(email, g.weergavenaam, mapNaam, inviteToken)
+    return NextResponse.json({ ok: true, modus: 'invite', uitnodiging: { token: inviteToken }, mail })
   }
 
-  db.prepare(`
-    INSERT INTO deel_map (map_id, ontvanger_type, ontvanger_id, gedeeld_door, mag_uploaden) VALUES (?, 'account', ?, ?, ?)
-    ON CONFLICT(map_id, ontvanger_type, ontvanger_id) DO UPDATE SET mag_uploaden = excluded.mag_uploaden
-  `).run(Number(map_id), account.id, g.id, upload)
-
-  const uitnodiging = account.status !== 'actief' && account.invite_token
-    ? { token: account.invite_token, nieuw: nieuweUitnodiging } : null
-  return NextResponse.json({
-    ok: true,
-    account: { id: account.id, weergavenaam: account.weergavenaam, email: account.email, status: account.status },
-    uitnodiging,
-  })
+  // NEE: publieke map-downloadlink (hele map als zip, geen account) + mailen.
+  const token = maakDeelToken()
+  db.prepare('INSERT INTO deel_map_link (map_id, token, aangemaakt_door) VALUES (?, ?, ?)')
+    .run(Number(map_id), token, g.id)
+  const mail = await mailPubliekeLink([email], g.weergavenaam, mapNaam, appUrl(`/dm/${token}`), { map: true, bericht: String(bericht || '') })
+  return NextResponse.json({ ok: true, modus: 'maplink', token, mail })
 }
 
 // Deling van een map intrekken.

@@ -77,6 +77,7 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
   const [fout, setFout] = useState('')
   const [bezig, setBezig] = useState(false)
   const [magUploaden, setMagUploaden] = useState(false)
+  const [uitnodigen, setUitnodigen] = useState(false)
 
   const laad = useCallback(async () => {
     const rg = await fetch('/api/groepen'); if (rg.ok) setMijnGroepen((await rg.json()).groepen)
@@ -95,15 +96,20 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
     setBezig(true); setFout(''); setResultaat(null)
     try {
       const url = isBestand ? '/api/deel/account' : '/api/deel/map'
-      const body = isBestand ? { bestand_id: doel.id, ontvanger } : { map_id: doel.id, ontvanger, mag_uploaden: magUploaden }
+      const body = isBestand
+        ? { bestand_id: doel.id, ontvanger, uitnodigen }
+        : { map_id: doel.id, ontvanger, mag_uploaden: magUploaden, uitnodigen }
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json()
       if (!r.ok) { setFout(d.error || 'Kon niet delen'); return }
       const naam = ontvanger.trim()
       setOntvanger('')
-      if (d.modus === 'link' && d.token) setResultaat({ type: 'link', url: `${origin}/d/${d.token}`, naam, mail: d.mail })
-      else if (d.uitnodiging?.token) setResultaat({ type: 'invite', url: `${origin}/uitnodiging/${d.uitnodiging.token}`, naam, mail: d.mail })
-      else setResultaat({ type: 'account', naam, mail: d.mail })
+      if ((d.modus === 'link' || d.modus === 'maplink') && d.token) {
+        const pad = d.modus === 'maplink' ? 'dm' : 'd'
+        setResultaat({ type: 'link', url: `${origin}/${pad}/${d.token}`, naam, mail: d.mail })
+      } else if (d.modus === 'invite' && d.uitnodiging?.token) {
+        setResultaat({ type: 'invite', url: `${origin}/uitnodiging/${d.uitnodiging.token}`, naam, mail: d.mail })
+      } else setResultaat({ type: 'account', naam, mail: d.mail })
       await laad(); onWijziging?.()
     } finally { setBezig(false) }
   }
@@ -167,11 +173,20 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
           <input value={ontvanger} onChange={e => setOntvanger(e.target.value)} placeholder="bijv. anna@voorbeeld.nl" className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" onKeyDown={e => { if (e.key === 'Enter') deelPersoon() }} />
           <button onClick={deelPersoon} disabled={bezig || !ontvanger} className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 text-sm">Deel</button>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          {isBestand
-            ? 'Bestaand account? Dan verschijnt het onder "Gedeeld met mij". Een e-mailadres zónder account krijgt automatisch een downloadlink gemaild — geen account nodig.'
-            : 'Nog geen account? Dan maken we een uitnodiging aan die je zelf doorstuurt.'}
-        </p>
+        <label className={`mt-2 flex items-start gap-2 text-sm rounded-lg p-2.5 cursor-pointer ${uitnodigen ? 'bg-amber-500/10 border border-amber-500/40' : 'bg-gray-800'}`}>
+          <input type="checkbox" checked={uitnodigen} onChange={e => setUitnodigen(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="font-medium">✉️ Uitnodigen om een account aan te maken</span>
+            <span className="block text-xs text-gray-500 mt-0.5">
+              {uitnodigen
+                ? 'Aan: de ontvanger krijgt een link om een account aan te maken (en ziet het dan onder "Gedeeld met mij").'
+                : (isBestand
+                    ? 'Uit: de ontvanger krijgt een directe downloadlink — geen account nodig.'
+                    : 'Uit: de ontvanger krijgt een directe link om de hele map als zip te downloaden — geen account nodig.')}
+            </span>
+          </span>
+        </label>
+        <p className="text-xs text-gray-500 mt-1">Bestaat er al een account met deze naam/e-mail? Dan delen we gewoon onder &quot;Gedeeld met mij&quot;.</p>
       </div>
 
       {fout && <div className="text-sm text-red-400">{fout}</div>}

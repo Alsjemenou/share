@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd, type Gebruiker } from '@/lib/auth'
 import { maakDeelToken } from '@/lib/deel'
-import { mailDeelMelding, mailPubliekeLink, appUrl, type MailResultaat } from '@/lib/mail'
+import { mailDeelMelding, mailUitnodiging, mailPubliekeLink, appUrl, type MailResultaat } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { bestand_id, ontvanger, bericht } = await req.json()
+  const { bestand_id, ontvanger, bericht, uitnodigen } = await req.json()
   if (!magBeheren(g, Number(bestand_id))) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
 
   const invoer = String(ontvanger || '').trim()
@@ -70,10 +70,28 @@ export async function POST(req: NextRequest) {
 
   // ── Geen account ────────────────────────────────────────────────────────────
   if (!email) {
-    return NextResponse.json({ error: 'Geen account met die naam. Vul een e-mailadres in — dan sturen we een downloadlink (geen account nodig).' }, { status: 400 })
+    return NextResponse.json({ error: 'Geen account met die naam. Vul een e-mailadres in — dan sturen we een downloadlink of een uitnodiging.' }, { status: 400 })
   }
 
-  // Unieke publieke downloadlink aanmaken en mailen (geen account nodig).
+  // JA: uitnodigen om een account aan te maken (invited account + activatielink).
+  if (uitnodigen) {
+    let gebruikersnaam = email
+    if (db.prepare('SELECT 1 FROM gebruiker WHERE gebruikersnaam = ?').get(gebruikersnaam)) {
+      gebruikersnaam = `${gebruikersnaam}-${maakDeelToken(3)}`
+    }
+    const inviteToken = maakDeelToken()
+    const r = db.prepare(`
+      INSERT INTO gebruiker (gebruikersnaam, weergavenaam, email, is_admin, status, invite_token)
+      VALUES (?, ?, ?, 0, 'uitgenodigd', ?)
+    `).run(gebruikersnaam, email, email, inviteToken)
+    const nieuwId = Number(r.lastInsertRowid)
+    db.prepare('INSERT OR IGNORE INTO deel_account (bestand_id, gebruiker_id, gedeeld_door) VALUES (?, ?, ?)')
+      .run(Number(bestand_id), nieuwId, g.id)
+    const mail = await mailUitnodiging(email, g.weergavenaam, bestandNaam, inviteToken)
+    return NextResponse.json({ ok: true, modus: 'invite', uitnodiging: { token: inviteToken }, mail })
+  }
+
+  // NEE: unieke publieke downloadlink aanmaken en mailen (geen account nodig).
   const token = maakDeelToken()
   db.prepare('INSERT INTO deel_link (bestand_id, token, aangemaakt_door, modus) VALUES (?, ?, ?, ?)')
     .run(Number(bestand_id), token, g.id, 'download')
