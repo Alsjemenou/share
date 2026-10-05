@@ -205,11 +205,16 @@ export async function PUT(req: NextRequest) {
   if (fout) return fout
   const body = await req.json() as Partial<SmbConfig>
   const oud = readConfig() ?? LEEG
+  const tekst = (k: keyof SmbConfig) => body[k] !== undefined ? String(body[k]) : (oud[k] as string)
+  // Alleen de echte configvelden overnemen (geen afgeleide velden zoals heeft_wachtwoord).
   const nieuw: SmbConfig = {
-    ...oud, ...body,
-    bewaar_aantal: Math.max(1, Number(body.bewaar_aantal ?? oud.bewaar_aantal) || 14),
+    server: tekst('server'), share: tekst('share'), pad: tekst('pad'),
+    domein: tekst('domein') || 'WORKGROUP', gebruiker: tekst('gebruiker'),
+    wachtwoord: body.wachtwoord ? String(body.wachtwoord) : oud.wachtwoord,
+    auto_enabled: body.auto_enabled !== undefined ? !!body.auto_enabled : oud.auto_enabled,
+    auto_freq: body.auto_freq === 'wekelijks' ? 'wekelijks' : (body.auto_freq === 'dagelijks' ? 'dagelijks' : oud.auto_freq),
     auto_weekdag: Math.min(6, Math.max(0, Number(body.auto_weekdag ?? oud.auto_weekdag) || 0)),
-    wachtwoord: body.wachtwoord ? body.wachtwoord : oud.wachtwoord,
+    bewaar_aantal: Math.max(1, Number(body.bewaar_aantal ?? oud.bewaar_aantal) || 14),
   }
   saveConfig(nieuw)
   return NextResponse.json({ ok: true })
