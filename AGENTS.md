@@ -48,8 +48,25 @@ mag `client_max_body_size` klein blijven. Het samengevoegde `.part`-bestand word
 
 - **Mijn bestanden** (`/`): uploaden, lijst, delen (`DeelDialog`), downloaden, verwijderen.
 - **Gedeeld met mij** (`/gedeeld`): bestanden die anderen met je account deelden.
-- **Beheer** (`/beheer`, alleen beheerder): alle bestanden, personen, database-back-up.
+- **Beheer** (`/beheer`, alleen beheerder, `?sectie=`): alle bestanden, personen, **E-mail** (SMTP), **Back-up**.
 - **Instellingen** (`/instellingen`): eigen profiel/wachtwoord, thema.
+
+## E-mailnotificaties (Beheer → E-mail)
+
+Gmail SMTP via app-wachtwoord (`lib/mail.ts`), config in de `instellingen`-tabel (`mail_enabled`,
+`mail_gmail_user`, `mail_gmail_wachtwoord`, `mail_afzender`) met terugval op env `GMAIL_USER` /
+`GMAIL_APP_PASSWORD`. Triggers: delen naar een bestaand account → melding; nieuw/uitgenodigd account →
+activatie-link; publieke link → optioneel mailen vanuit de deel-dialoog (`/api/deel/mail`). Links in
+mails gebruiken `SHARE_PUBLIC_URL` (server-env, bijv. `https://deel.audiorallysounddesign.com`).
+
+## Back-up (Beheer → Back-up)
+
+Alleen de **database** (`share.db` + info) — nooit de bestanden (die staan op de netwerkschijf). Naast
+handmatig downloaden/herstellen (`/api/backup`) is er automatische back-up naar een **SMB-share**
+(`/api/backup/smb`, `@marsaud/smb2`): server/share/pad/credentials, frequentie (dagelijks/wekelijks),
+aantal versies (retentie) en **restore vanaf de share**. Config in `instellingen.smb_config` (JSON).
+Back-ups zijn **AES-256-GCM-versleuteld** als `BACKUP_ENC_KEY` is gezet (prefix `DBK1`). De automatische
+run draait via systeem-cron (`scripts/cron-backup.sh`) die `?cron=1&secret=CRON_SECRET` aanroept.
 
 ## Eerste gebruik
 

@@ -249,6 +249,16 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // ── Instellingen (key/value) ──────────────────────────────────────────────────
+  // Beheer-brede instellingen: SMTP/e-mail (mail_*) en de SMB-backupconfig
+  // (smb_config als JSON). Geheimen worden nooit onversleuteld naar de client gestuurd.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS instellingen (
+      sleutel TEXT PRIMARY KEY,
+      waarde TEXT NOT NULL DEFAULT ''
+    );
+  `)
+
   // ── Lopende uploads (hervatbaar / chunked) ────────────────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS upload_sessie (

@@ -6,7 +6,7 @@ import VerplaatsDialog from '@/components/VerplaatsDialog'
 import { useGebruiker } from '@/components/AuthGate'
 import { formatBytes, formatDatumKort, bestandIcoon } from '@/lib/format'
 
-const TITELS: Record<string, string> = { bestanden: '📦 Alle bestanden', personen: '👥 Users', backup: '💾 Back-up' }
+const TITELS: Record<string, string> = { bestanden: '📦 Alle bestanden', personen: '👥 Users', email: '✉️ E-mail', backup: '💾 Back-up' }
 
 export default function BeheerPage() {
   return <Suspense fallback={null}><BeheerInner /></Suspense>
@@ -26,6 +26,7 @@ function BeheerInner() {
       <h1 className="text-2xl font-bold mb-5">{TITELS[sectie] || 'Beheer'}</h1>
       {sectie === 'bestanden' && <AlleBestanden />}
       {sectie === 'personen' && <Personen />}
+      {sectie === 'email' && <EmailBeheer />}
       {sectie === 'backup' && <Backup />}
     </div>
   )
@@ -185,7 +186,70 @@ function Personen() {
   )
 }
 
+// ── E-mail ──────────────────────────────────────────────────────────────────────
+const invoer = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm w-full'
+function EmailBeheer() {
+  const [cfg, setCfg] = useState({ mail_enabled: '0', mail_gmail_user: '', mail_gmail_wachtwoord: '', mail_afzender: 'Deel' })
+  const [testNaar, setTestNaar] = useState('')
+  const [melding, setMelding] = useState<{ t: string; ok: boolean } | null>(null)
+  const [bezig, setBezig] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/instellingen').then(r => r.json()).then(d => setCfg(c => ({ ...c, ...d, mail_gmail_wachtwoord: d.mail_gmail_wachtwoord === '__SET__' ? '__SET__' : '' })))
+  }, [])
+
+  async function opslaan() {
+    setBezig(true); setMelding(null)
+    const body: Record<string, string> = { mail_enabled: cfg.mail_enabled, mail_gmail_user: cfg.mail_gmail_user, mail_afzender: cfg.mail_afzender }
+    if (cfg.mail_gmail_wachtwoord && cfg.mail_gmail_wachtwoord !== '__SET__') body.mail_gmail_wachtwoord = cfg.mail_gmail_wachtwoord
+    const r = await fetch('/api/instellingen', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    setMelding(r.ok ? { t: 'Opgeslagen.', ok: true } : { t: 'Opslaan mislukte', ok: false })
+    if (r.ok && cfg.mail_gmail_wachtwoord) setCfg(c => ({ ...c, mail_gmail_wachtwoord: '__SET__' }))
+    setBezig(false)
+  }
+  async function testmail() {
+    setBezig(true); setMelding(null)
+    const r = await fetch('/api/instellingen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actie: 'test-mail', naar: testNaar }) })
+    const d = await r.json()
+    setMelding(r.ok ? { t: `Testmail verstuurd naar ${d.naar}.`, ok: true } : { t: d.error || 'Versturen mislukte', ok: false })
+    setBezig(false)
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4 max-w-lg">
+      <div>
+        <h2 className="font-semibold mb-1">E-mailnotificaties</h2>
+        <p className="text-sm text-gray-500">Via Gmail (SMTP) met een <b>app-wachtwoord</b>. Bij delen naar een account krijgt de ontvanger automatisch bericht; nieuwe accounts krijgen hun activatielink gemaild. <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noreferrer" className="text-amber-400 underline">App-wachtwoord aanmaken</a>.</p>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={cfg.mail_enabled === '1'} onChange={e => setCfg({ ...cfg, mail_enabled: e.target.checked ? '1' : '0' })} />
+        E-mailnotificaties aanzetten
+      </label>
+      <div className="space-y-2">
+        <label className="block text-xs text-gray-400">Afzender-adres (Gmail)</label>
+        <input value={cfg.mail_gmail_user} onChange={e => setCfg({ ...cfg, mail_gmail_user: e.target.value })} placeholder="jij@gmail.com" className={invoer} autoComplete="off" />
+        <label className="block text-xs text-gray-400">App-wachtwoord</label>
+        <input type="password" value={cfg.mail_gmail_wachtwoord === '__SET__' ? '' : cfg.mail_gmail_wachtwoord} onChange={e => setCfg({ ...cfg, mail_gmail_wachtwoord: e.target.value })} placeholder={cfg.mail_gmail_wachtwoord === '__SET__' ? '•••••••• (ingesteld — leeg laten = behouden)' : '16-cijferig app-wachtwoord'} className={invoer} autoComplete="new-password" />
+        <label className="block text-xs text-gray-400">Afzendernaam</label>
+        <input value={cfg.mail_afzender} onChange={e => setCfg({ ...cfg, mail_afzender: e.target.value })} placeholder="Deel" className={invoer} />
+      </div>
+      <button onClick={opslaan} disabled={bezig} className="bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2 text-sm disabled:opacity-50">Opslaan</button>
+
+      <div className="pt-4 border-t border-gray-800 space-y-2">
+        <h3 className="font-medium text-sm">Testmail</h3>
+        <div className="flex gap-2">
+          <input value={testNaar} onChange={e => setTestNaar(e.target.value)} placeholder="ontvanger@voorbeeld.nl (leeg = jezelf)" className={invoer} />
+          <button onClick={testmail} disabled={bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2 text-sm shrink-0 disabled:opacity-50">Verstuur</button>
+        </div>
+      </div>
+      {melding && <div className={`text-sm ${melding.ok ? 'text-emerald-400' : 'text-red-400'}`}>{melding.t}</div>}
+    </div>
+  )
+}
+
 // ── Back-up ───────────────────────────────────────────────────────────────────
+const WEEKDAGEN = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
+type SmbCfg = { server: string; share: string; pad: string; domein: string; gebruiker: string; wachtwoord: string; heeft_wachtwoord?: boolean; auto_enabled: boolean; auto_freq: 'dagelijks' | 'wekelijks'; auto_weekdag: number; bewaar_aantal: number; versleuteld?: boolean }
 function Backup() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [melding, setMelding] = useState('')
@@ -202,22 +266,127 @@ function Backup() {
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4 max-w-lg">
-      <div>
-        <h2 className="font-semibold mb-1">Database back-up</h2>
-        <p className="text-sm text-gray-500">
-          Download een ZIP met alle accounts, bestand-gegevens en deel-links. De <b>bestanden zelf</b> (map <code className="text-gray-400">data/bestanden</code>) zitten hier niet in — die neem je mee in je gewone (versleutelde) back-up van de data-map.
-        </p>
+    <div className="space-y-5 max-w-lg">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+        <div>
+          <h2 className="font-semibold mb-1">Database back-up</h2>
+          <p className="text-sm text-gray-500">
+            Back-up bevat alleen de <b>applicatie-database</b> (accounts, bestand-gegevens, deel-links, instellingen). De <b>bestanden zelf</b> staan op de netwerkschijf en hebben hun eigen back-up.
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <a href="/api/backup" className="inline-block bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2.5 text-sm">💾 Nu downloaden</a>
+          <input ref={inputRef} type="file" accept=".zip" className="hidden" onChange={e => { if (e.target.files?.[0]) herstel(e.target.files[0]); e.target.value = '' }} />
+          <button onClick={() => inputRef.current?.click()} disabled={bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2.5 text-sm disabled:opacity-50">{bezig ? 'Bezig…' : 'Uit bestand herstellen…'}</button>
+        </div>
+        {melding && <div className="text-sm text-amber-300">{melding}</div>}
       </div>
-      <a href="/api/backup" className="inline-block bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2.5 text-sm">💾 Back-up downloaden</a>
 
-      <div className="pt-4 border-t border-gray-800">
-        <h3 className="font-medium text-sm mb-1">Herstellen</h3>
-        <p className="text-sm text-gray-500 mb-2">Zet een eerder gedownloade back-up terug.</p>
-        <input ref={inputRef} type="file" accept=".zip" className="hidden" onChange={e => { if (e.target.files?.[0]) herstel(e.target.files[0]); e.target.value = '' }} />
-        <button onClick={() => inputRef.current?.click()} disabled={bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2.5 text-sm disabled:opacity-50">{bezig ? 'Bezig…' : 'Back-up kiezen…'}</button>
-        {melding && <div className="text-sm mt-2 text-amber-300">{melding}</div>}
+      <SmbBackup />
+    </div>
+  )
+}
+
+function SmbBackup() {
+  const [cfg, setCfg] = useState<SmbCfg | null>(null)
+  const [melding, setMelding] = useState<{ t: string; ok: boolean } | null>(null)
+  const [bezig, setBezig] = useState('')
+  const [backups, setBackups] = useState<string[] | null>(null)
+
+  useEffect(() => { fetch('/api/backup/smb').then(r => r.json()).then(setCfg) }, [])
+  if (!cfg) return <div className="text-gray-500 text-sm">Laden…</div>
+  const set = (v: Partial<SmbCfg>) => setCfg({ ...cfg, ...v })
+
+  async function opslaan() {
+    setBezig('opslaan'); setMelding(null)
+    const body = { ...cfg }
+    if (cfg!.heeft_wachtwoord && !cfg!.wachtwoord) delete (body as Record<string, unknown>).wachtwoord // leeg = behouden
+    const r = await fetch('/api/backup/smb', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    setMelding(r.ok ? { t: 'Opgeslagen.', ok: true } : { t: 'Opslaan mislukte', ok: false })
+    if (r.ok && cfg!.wachtwoord) setCfg({ ...cfg!, wachtwoord: '', heeft_wachtwoord: true })
+    setBezig('')
+  }
+  async function actie(_actie: string, extra: Record<string, unknown> = {}) {
+    setBezig(_actie); setMelding(null)
+    const r = await fetch('/api/backup/smb', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _actie, ...extra }) })
+    const d = await r.json()
+    if (_actie === 'lijst') { if (r.ok) setBackups(d.backups); else setMelding({ t: d.error || 'Ophalen mislukte', ok: false }) }
+    else if (_actie === 'test') setMelding(r.ok ? { t: d.bericht || 'Verbinding OK', ok: true } : { t: d.error || 'Test mislukte', ok: false })
+    else if (_actie === 'nu') setMelding(r.ok ? { t: `Back-up gemaakt: ${d.bestand}`, ok: true } : { t: d.error || 'Back-up mislukte', ok: false })
+    else if (_actie === 'herstel') setMelding(r.ok ? { t: 'Hersteld. Log opnieuw in.', ok: true } : { t: d.error || 'Herstellen mislukte', ok: false })
+    setBezig('')
+  }
+  async function herstelVersie(bestand: string) {
+    if (!confirm(`De database wordt vervangen door back-up "${bestand}". Doorgaan?`)) return
+    await actie('herstel', { bestand })
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+      <div>
+        <h2 className="font-semibold mb-1">Automatische back-up naar SMB-share</h2>
+        <p className="text-sm text-gray-500">Zet de database periodiek weg op een netwerkshare. {cfg.versleuteld ? <span className="text-emerald-400">Back-ups worden versleuteld (AES-256).</span> : <span className="text-amber-400">Let op: BACKUP_ENC_KEY ontbreekt — back-ups zijn onversleuteld.</span>}</p>
       </div>
+
+      <div className="grid sm:grid-cols-2 gap-2">
+        <div><label className="block text-xs text-gray-400 mb-1">Server (IP/host)</label><input value={cfg.server} onChange={e => set({ server: e.target.value })} placeholder="192.168.2.205" className={invoer} /></div>
+        <div><label className="block text-xs text-gray-400 mb-1">Share</label><input value={cfg.share} onChange={e => set({ share: e.target.value })} placeholder="backups" className={invoer} /></div>
+        <div><label className="block text-xs text-gray-400 mb-1">Map (pad in share, optioneel)</label><input value={cfg.pad} onChange={e => set({ pad: e.target.value })} placeholder="deel" className={invoer} /></div>
+        <div><label className="block text-xs text-gray-400 mb-1">Domein/werkgroep</label><input value={cfg.domein} onChange={e => set({ domein: e.target.value })} placeholder="WORKGROUP" className={invoer} /></div>
+        <div><label className="block text-xs text-gray-400 mb-1">Gebruiker</label><input value={cfg.gebruiker} onChange={e => set({ gebruiker: e.target.value })} autoComplete="off" className={invoer} /></div>
+        <div><label className="block text-xs text-gray-400 mb-1">Wachtwoord</label><input type="password" value={cfg.wachtwoord} onChange={e => set({ wachtwoord: e.target.value })} placeholder={cfg.heeft_wachtwoord ? '•••••• (ingesteld)' : ''} autoComplete="new-password" className={invoer} /></div>
+      </div>
+
+      <div className="pt-3 border-t border-gray-800 grid sm:grid-cols-2 gap-3">
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" checked={cfg.auto_enabled} onChange={e => set({ auto_enabled: e.target.checked })} />
+          Automatische back-up aanzetten
+        </label>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Frequentie</label>
+          <select value={cfg.auto_freq} onChange={e => set({ auto_freq: e.target.value as 'dagelijks' | 'wekelijks' })} className={invoer}>
+            <option value="dagelijks">Dagelijks</option>
+            <option value="wekelijks">Wekelijks</option>
+          </select>
+        </div>
+        {cfg.auto_freq === 'wekelijks' && (
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Op welke dag</label>
+            <select value={cfg.auto_weekdag} onChange={e => set({ auto_weekdag: Number(e.target.value) })} className={invoer}>
+              {WEEKDAGEN.map((d, i) => <option key={i} value={i}>{d}</option>)}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Aantal versies bewaren</label>
+          <input type="number" min={1} value={cfg.bewaar_aantal} onChange={e => set({ bewaar_aantal: Number(e.target.value) })} className={invoer} />
+        </div>
+      </div>
+
+      <div className="flex gap-2 flex-wrap pt-1">
+        <button onClick={opslaan} disabled={!!bezig} className="bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2 text-sm disabled:opacity-50">{bezig === 'opslaan' ? 'Opslaan…' : 'Opslaan'}</button>
+        <button onClick={() => actie('test')} disabled={!!bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">{bezig === 'test' ? 'Testen…' : 'Verbinding testen'}</button>
+        <button onClick={() => actie('nu')} disabled={!!bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">{bezig === 'nu' ? 'Bezig…' : 'Nu back-uppen'}</button>
+        <button onClick={() => actie('lijst')} disabled={!!bezig} className="bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">{bezig === 'lijst' ? 'Ophalen…' : 'Versies tonen'}</button>
+      </div>
+
+      {backups && (
+        <div className="pt-3 border-t border-gray-800">
+          <h3 className="font-medium text-sm mb-2">Back-ups op de share ({backups.length})</h3>
+          {backups.length === 0 ? <p className="text-sm text-gray-500">Nog geen back-ups gevonden.</p> : (
+            <div className="space-y-1">
+              {backups.map(b => (
+                <div key={b} className="flex items-center justify-between gap-3 bg-gray-800/60 rounded-lg px-3 py-2">
+                  <span className="text-xs font-mono truncate">{b}</span>
+                  <button onClick={() => herstelVersie(b)} disabled={!!bezig} className="text-xs bg-gray-700 hover:bg-amber-600 hover:text-white rounded px-2.5 py-1 shrink-0 disabled:opacity-50">Herstel</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {melding && <div className={`text-sm ${melding.ok ? 'text-emerald-400' : 'text-red-400'}`}>{melding.t}</div>}
     </div>
   )
 }

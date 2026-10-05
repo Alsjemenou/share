@@ -19,6 +19,7 @@ const MENU: Item[] = [
       { label: 'Alle bestanden', path: '/beheer', sectie: 'bestanden' },
       { label: 'Users', path: '/beheer', sectie: 'personen' },
       { label: 'Groeps', path: '/groepen', sectie: null },
+      { label: 'E-mail', path: '/beheer', sectie: 'email' },
       { label: 'Back-up', path: '/beheer', sectie: 'backup' },
     ],
   },

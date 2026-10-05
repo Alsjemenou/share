@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd, type Gebruiker } from '@/lib/auth'
 import { maakDeelToken } from '@/lib/deel'
+import { mailDeelMelding, mailUitnodiging, type MailResultaat } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
@@ -78,10 +79,22 @@ export async function POST(req: NextRequest) {
     ? { token: account.invite_token, nieuw: nieuweUitnodiging }
     : null
 
+  // E-mailnotificatie (als e-mail aanstaat en de ontvanger een adres heeft).
+  // Nieuw/uitgenodigd account → activatie-link; bestaand actief account → melding.
+  let mail: MailResultaat | undefined
+  if (account.email) {
+    const b = db.prepare('SELECT originele_naam FROM bestand WHERE id = ?').get(Number(bestand_id)) as { originele_naam: string } | undefined
+    const wat = b?.originele_naam || 'een bestand'
+    mail = uitnodiging
+      ? await mailUitnodiging(account.email, g.weergavenaam, wat, uitnodiging.token)
+      : await mailDeelMelding(account.email, g.weergavenaam, wat)
+  }
+
   return NextResponse.json({
     ok: true,
     account: { id: account.id, weergavenaam: account.weergavenaam, email: account.email, status: account.status },
     uitnodiging,
+    mail,
   })
 }
 

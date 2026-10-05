@@ -211,6 +211,37 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
   )
 }
 
+// Stuur een bestaande publieke link per e-mail (uitklapbaar onder de link).
+function LinkMailer({ token }: { token: string }) {
+  const [open, setOpen] = useState(false)
+  const [naar, setNaar] = useState('')
+  const [bericht, setBericht] = useState('')
+  const [bezig, setBezig] = useState(false)
+  const [status, setStatus] = useState<{ t: string; ok: boolean } | null>(null)
+
+  async function verstuur() {
+    setBezig(true); setStatus(null)
+    const r = await fetch('/api/deel/mail', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, naar, bericht }) })
+    const d = await r.json()
+    if (r.ok) { setStatus({ t: `Verstuurd naar ${d.naar}`, ok: true }); setNaar(''); setBericht(''); setTimeout(() => setOpen(false), 1500) }
+    else setStatus({ t: d.error || 'Versturen mislukte', ok: false })
+    setBezig(false)
+  }
+
+  if (!open) return <button onClick={() => setOpen(true)} className="hover:text-white underline">✉️ Mail</button>
+  return (
+    <div className="w-full mt-2 border-t border-gray-700 pt-2 space-y-2" onClick={e => e.stopPropagation()}>
+      <input value={naar} onChange={e => setNaar(e.target.value)} placeholder="ontvanger@voorbeeld.nl, ook@meer.nl" className="w-full bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-xs" />
+      <textarea value={bericht} onChange={e => setBericht(e.target.value)} placeholder="Persoonlijk bericht (optioneel)" rows={2} className="w-full bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-xs resize-none" />
+      <div className="flex gap-2 items-center">
+        <button onClick={verstuur} disabled={bezig || !naar.trim()} className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-md px-3 py-1 text-xs font-medium">{bezig ? 'Versturen…' : 'Verstuur'}</button>
+        <button onClick={() => { setOpen(false); setStatus(null) }} className="text-gray-400 hover:text-white underline text-xs">Sluit</button>
+        {status && <span className={`text-xs ${status.ok ? 'text-emerald-400' : 'text-red-400'}`}>{status.t}</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── Publieke link (alleen bestand) ────────────────────────────────────────────
 function LinkTab({ bestandId, mime, origin, onWijziging }: { bestandId: number; mime?: string; origin: string; onWijziging?: () => void }) {
   const [links, setLinks] = useState<Link[]>([])
@@ -267,6 +298,7 @@ function LinkTab({ bestandId, mime, origin, onWijziging }: { bestandId: number; 
                     <button onClick={() => wis(l)} className="hover:text-red-300 underline">Verwijder</button>
                   </span>
                 </div>
+                {l.actief ? <div className="mt-1 text-xs text-gray-400"><LinkMailer token={l.token} /></div> : null}
               </div>
             )
           })}
