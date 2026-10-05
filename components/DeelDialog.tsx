@@ -72,7 +72,8 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
   const [mijnGroepen, setMijnGroepen] = useState<MijnGroep[]>([])
   const [ontvanger, setOntvanger] = useState('')
   const [kiesGroep, setKiesGroep] = useState('')
-  const [invite, setInvite] = useState('')
+  type DeelRes = { type: 'link' | 'invite' | 'account'; url?: string; naam?: string; mail?: { ok: boolean; naar?: string; error?: string; overgeslagen?: string } }
+  const [resultaat, setResultaat] = useState<DeelRes | null>(null)
   const [fout, setFout] = useState('')
   const [bezig, setBezig] = useState(false)
   const [magUploaden, setMagUploaden] = useState(false)
@@ -91,15 +92,18 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
 
   async function deelPersoon() {
     if (!ontvanger.trim()) return
-    setBezig(true); setFout(''); setInvite('')
+    setBezig(true); setFout(''); setResultaat(null)
     try {
       const url = isBestand ? '/api/deel/account' : '/api/deel/map'
       const body = isBestand ? { bestand_id: doel.id, ontvanger } : { map_id: doel.id, ontvanger, mag_uploaden: magUploaden }
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json()
       if (!r.ok) { setFout(d.error || 'Kon niet delen'); return }
+      const naam = ontvanger.trim()
       setOntvanger('')
-      if (d.uitnodiging?.token) setInvite(`${origin}/uitnodiging/${d.uitnodiging.token}`)
+      if (d.modus === 'link' && d.token) setResultaat({ type: 'link', url: `${origin}/d/${d.token}`, naam, mail: d.mail })
+      else if (d.uitnodiging?.token) setResultaat({ type: 'invite', url: `${origin}/uitnodiging/${d.uitnodiging.token}`, naam, mail: d.mail })
+      else setResultaat({ type: 'account', naam, mail: d.mail })
       await laad(); onWijziging?.()
     } finally { setBezig(false) }
   }
@@ -163,17 +167,32 @@ function DelenTab({ doel, origin, onWijziging }: { doel: DeelDoel; origin: strin
           <input value={ontvanger} onChange={e => setOntvanger(e.target.value)} placeholder="bijv. anna@voorbeeld.nl" className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" onKeyDown={e => { if (e.key === 'Enter') deelPersoon() }} />
           <button onClick={deelPersoon} disabled={bezig || !ontvanger} className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 text-sm">Deel</button>
         </div>
-        <p className="text-xs text-gray-500 mt-1">Nog geen account? Dan maken we een uitnodiging aan die je zelf doorstuurt.</p>
+        <p className="text-xs text-gray-500 mt-1">
+          {isBestand
+            ? 'Bestaand account? Dan verschijnt het onder "Gedeeld met mij". Een e-mailadres zónder account krijgt automatisch een downloadlink gemaild — geen account nodig.'
+            : 'Nog geen account? Dan maken we een uitnodiging aan die je zelf doorstuurt.'}
+        </p>
       </div>
 
       {fout && <div className="text-sm text-red-400">{fout}</div>}
-      {invite && (
-        <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3">
-          <div className="text-xs text-amber-200 mb-2">📨 Uitnodigingslink — stuur deze naar de ontvanger:</div>
-          <div className="flex items-center gap-2">
-            <input readOnly value={invite} className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-xs" onFocus={e => e.target.select()} />
-            <KopieerKnop tekst={invite} />
-          </div>
+      {resultaat && (
+        <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3 space-y-2">
+          {resultaat.type === 'link' && <div className="text-xs text-amber-200">🔗 Downloadlink aangemaakt{resultaat.naam ? ` voor ${resultaat.naam}` : ''} — geen account nodig:</div>}
+          {resultaat.type === 'invite' && <div className="text-xs text-amber-200">📨 Uitnodigingslink — stuur deze naar de ontvanger:</div>}
+          {resultaat.type === 'account' && <div className="text-xs text-amber-200">✓ Gedeeld met {resultaat.naam}. Zichtbaar onder &quot;Gedeeld met mij&quot;.</div>}
+          {resultaat.url && (
+            <div className="flex items-center gap-2">
+              <input readOnly value={resultaat.url} className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-xs" onFocus={e => e.target.select()} />
+              <KopieerKnop tekst={resultaat.url} />
+            </div>
+          )}
+          {resultaat.mail && (
+            <div className={`text-xs ${resultaat.mail.ok ? 'text-emerald-400' : 'text-gray-400'}`}>
+              {resultaat.mail.ok
+                ? `✉️ Gemaild naar ${resultaat.mail.naar}.`
+                : `✉️ Niet automatisch gemaild (${resultaat.mail.error || resultaat.mail.overgeslagen || 'e-mail uit'})${resultaat.url ? ' — kopieer de link hierboven.' : ''}`}
+            </div>
+          )}
         </div>
       )}
 

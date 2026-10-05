@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { huidigeGebruiker, nietIngelogd, type Gebruiker } from '@/lib/auth'
 import { maakDeelToken } from '@/lib/deel'
-import { mailDeelMelding, mailUitnodiging, type MailResultaat } from '@/lib/mail'
+import { mailDeelMelding, mailPubliekeLink, appUrl, type MailResultaat } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
@@ -30,13 +30,14 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ accounts })
 }
 
-// Deel een bestand met een persoon (op naam of e-mail).
-// Bestaat er nog geen account, dan wordt een 'uitgenodigd' account + invite-link
-// aangemaakt die de deler zelf doorstuurt (geen e-mailserver nodig).
+// Deel een bestand met een persoon.
+// - Bestaat er al een account (op naam of e-mail) → delen onder "Gedeeld met mij".
+// - Een e-mailadres ZONDER account → unieke publieke downloadlink + mailen (geen account).
+// - Een naam zonder account → vriendelijke fout (vraag om een e-mailadres).
 export async function POST(req: NextRequest) {
   const g = await huidigeGebruiker()
   if (!g) return nietIngelogd()
-  const { bestand_id, ontvanger } = await req.json()
+  const { bestand_id, ontvanger, bericht } = await req.json()
   if (!magBeheren(g, Number(bestand_id))) return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
 
   const invoer = String(ontvanger || '').trim()
@@ -44,58 +45,40 @@ export async function POST(req: NextRequest) {
 
   const db = getDb()
   const email = isEmail(invoer) ? invoer : null
+  const b = db.prepare('SELECT originele_naam FROM bestand WHERE id = ?').get(Number(bestand_id)) as { originele_naam: string } | undefined
+  const bestandNaam = b?.originele_naam || 'een bestand'
 
   // Bestaand account zoeken op e-mail of gebruikersnaam.
-  let account = db.prepare(
-    'SELECT id, weergavenaam, email, status, invite_token FROM gebruiker WHERE email = ? OR gebruikersnaam = ?'
+  const account = db.prepare(
+    'SELECT id, weergavenaam, email, status FROM gebruiker WHERE email = ? COLLATE NOCASE OR gebruikersnaam = ?'
   ).get(email, invoer) as
-    | { id: number; weergavenaam: string; email: string | null; status: string; invite_token: string | null }
+    | { id: number; weergavenaam: string; email: string | null; status: string }
     | undefined
 
-  let nieuweUitnodiging = false
-  if (!account) {
-    // Nieuw 'uitgenodigd' account aanmaken (nog geen wachtwoord).
-    let gebruikersnaam = email || invoer
-    // Zorg voor een unieke gebruikersnaam.
-    if (db.prepare('SELECT 1 FROM gebruiker WHERE gebruikersnaam = ?').get(gebruikersnaam)) {
-      gebruikersnaam = `${gebruikersnaam}-${maakDeelToken(3)}`
-    }
-    const token = maakDeelToken()
-    const r = db.prepare(`
-      INSERT INTO gebruiker (gebruikersnaam, weergavenaam, email, is_admin, status, invite_token)
-      VALUES (?, ?, ?, 0, 'uitgenodigd', ?)
-    `).run(gebruikersnaam, invoer, email, token)
-    account = { id: Number(r.lastInsertRowid), weergavenaam: invoer, email, status: 'uitgenodigd', invite_token: token }
-    nieuweUitnodiging = true
+  // ── Bestaand account → delen onder "Gedeeld met mij" ────────────────────────
+  if (account) {
+    db.prepare('INSERT OR IGNORE INTO deel_account (bestand_id, gebruiker_id, gedeeld_door) VALUES (?, ?, ?)')
+      .run(Number(bestand_id), account.id, g.id)
+    let mail: MailResultaat | undefined
+    if (account.email) mail = await mailDeelMelding(account.email, g.weergavenaam, bestandNaam)
+    return NextResponse.json({
+      ok: true, modus: 'account',
+      account: { id: account.id, weergavenaam: account.weergavenaam, email: account.email, status: account.status },
+      mail,
+    })
   }
 
-  // Koppeling leggen (idempotent).
-  db.prepare(`
-    INSERT OR IGNORE INTO deel_account (bestand_id, gebruiker_id, gedeeld_door) VALUES (?, ?, ?)
-  `).run(Number(bestand_id), account.id, g.id)
-
-  // Uitnodigingslink meegeven als het account nog niet actief is.
-  const uitnodiging = account.status !== 'actief' && account.invite_token
-    ? { token: account.invite_token, nieuw: nieuweUitnodiging }
-    : null
-
-  // E-mailnotificatie (als e-mail aanstaat en de ontvanger een adres heeft).
-  // Nieuw/uitgenodigd account → activatie-link; bestaand actief account → melding.
-  let mail: MailResultaat | undefined
-  if (account.email) {
-    const b = db.prepare('SELECT originele_naam FROM bestand WHERE id = ?').get(Number(bestand_id)) as { originele_naam: string } | undefined
-    const wat = b?.originele_naam || 'een bestand'
-    mail = uitnodiging
-      ? await mailUitnodiging(account.email, g.weergavenaam, wat, uitnodiging.token)
-      : await mailDeelMelding(account.email, g.weergavenaam, wat)
+  // ── Geen account ────────────────────────────────────────────────────────────
+  if (!email) {
+    return NextResponse.json({ error: 'Geen account met die naam. Vul een e-mailadres in — dan sturen we een downloadlink (geen account nodig).' }, { status: 400 })
   }
 
-  return NextResponse.json({
-    ok: true,
-    account: { id: account.id, weergavenaam: account.weergavenaam, email: account.email, status: account.status },
-    uitnodiging,
-    mail,
-  })
+  // Unieke publieke downloadlink aanmaken en mailen (geen account nodig).
+  const token = maakDeelToken()
+  db.prepare('INSERT INTO deel_link (bestand_id, token, aangemaakt_door, modus) VALUES (?, ?, ?, ?)')
+    .run(Number(bestand_id), token, g.id, 'download')
+  const mail = await mailPubliekeLink([email], g.weergavenaam, bestandNaam, appUrl(`/d/${token}`), { bericht: String(bericht || '') })
+  return NextResponse.json({ ok: true, modus: 'link', token, mail })
 }
 
 // Deling met een account intrekken.
